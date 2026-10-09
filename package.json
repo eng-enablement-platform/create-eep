@@ -26,6 +26,9 @@
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^24.19.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "@vitest/eslint-plugin": "^1.6.27",
+    "console-fail-test": "^0.10.0",
     "eslint": "^10.12.0",
     "eslint-plugin-jsdoc": "^65.2.0",
     "eslint-plugin-simple-import-sort": "^14.0.0",
@@ -33,7 +36,8 @@
     "jiti": "^2.7.0",
     "prettier": "^3.9.9",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.71.1"
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
   },
   "scripts": {
     "dev": "node src/index.ts",
@@ -42,6 +46,9 @@
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
-    "lint:probe": "bash scripts/lint-probe.sh"
+    "lint:probe": "bash scripts/lint-probe.sh",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   }
 }

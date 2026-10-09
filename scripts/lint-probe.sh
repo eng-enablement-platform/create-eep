@@ -113,6 +113,11 @@ probe "strictTypeChecked - fails on floating promise" \
   $'/**\n * Kicks off work.\n *\n * @returns nothing\n */\nexport function run(): void {\n  Promise.resolve(1);\n}' \
   "@typescript-eslint/no-floating-promises"
 
+probe "vitest/expect-expect - fails on a test with no assertion" \
+  "__tests__/no-assertion.test.ts" "fail" \
+  $'import { it } from \'vitest\';\n\nit(\'does nothing\', () => {\n  const value = 1;\n  void value;\n});' \
+  "vitest/expect-expect"
+
 echo ""
 echo "Passed: $passed   Failed: $failed"
 

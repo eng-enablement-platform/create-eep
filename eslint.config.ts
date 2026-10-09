@@ -1,5 +1,6 @@
 import eslint from '@eslint/js';
 import stylistic from '@stylistic/eslint-plugin';
+import vitest from '@vitest/eslint-plugin';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import jsdoc from 'eslint-plugin-jsdoc';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
@@ -129,6 +130,13 @@ export default defineConfig([
       'jsdoc/require-param-type': 'off',
       'jsdoc/require-returns-type': 'off',
     },
+  },
+
+  // Vitest rules for test files.
+  {
+    files: ['**/__tests__/**/*.test.ts'],
+    extends: [vitest.configs.recommended],
+    settings: { vitest: { typecheck: true } },
   },
 
   // Tool config files must default-export (loader requirement).

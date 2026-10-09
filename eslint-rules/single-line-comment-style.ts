@@ -40,9 +40,10 @@ const isDirective = (value: string): boolean => {
  * is always a line comment, multiple lines are always a block comment.
  *
  * Exemptions: TSDoc and JSDoc comments (content starting with an asterisk) and
- * tooling directives (`eslint-*`, `ts-*`, and similar) keep their block form.
+ * tooling directives (`eslint-*`, `ts-*`, and similar) keep their block form,
+ * as do inline comments followed by code on the same line.
  *
- * Ported from eep-template-next-app.
+ * Ported from eep-template-next-app, plus the inline-comment exemption.
  */
 export const singleLineCommentStyle: Rule.RuleModule = {
   meta: {
@@ -86,6 +87,18 @@ export const singleLineCommentStyle: Rule.RuleModule = {
 
           // Leave tooling directives as block comments.
           if (isDirective(comment.value)) {
+            continue;
+          }
+
+          /*
+           * Leave inline comments with code after them on the same line
+           * (e.g. `fn(/* retries *\/ 3)`) - converting those to `//` would
+           * comment out the rest of the line and break the code.
+           */
+          const nextToken = sourceCode.getTokenAfter(comment, {
+            includeComments: true,
+          });
+          if (nextToken?.loc?.start.line === loc.end.line) {
             continue;
           }
 
