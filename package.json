@@ -1,0 +1,20 @@
+{
+  "name": "create-eep",
+  "version": "0.0.0",
+  "description": "Scaffold new projects from Engineering Enablement Platform (EEP) templates. Under development.",
+  "keywords": [
+    "create",
+    "scaffold",
+    "template",
+    "eep"
+  ],
+  "homepage": "https://github.com/eng-enablement-platform/create-eep#readme",
+  "bugs": {
+    "url": "https://github.com/eng-enablement-platform/create-eep/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eng-enablement-platform/create-eep.git"
+  },
+  "license": "MIT"
+}
