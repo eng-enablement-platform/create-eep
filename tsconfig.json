@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    // Type-check only - tsdown owns the build (added in the build step).
+    "noEmit": true,
+
+    // Node ESM: package.json "type": "module" decides module format.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2023",
+    "types": ["node"],
+
+    // Native `node src/index.ts` only strips types, so ban TS syntax that
+    // emits runtime code (enums, namespaces, parameter properties) and
+    // require explicit `.ts` extensions on relative imports.
+    "erasableSyntaxOnly": true,
+    "rewriteRelativeImportExtensions": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+
+    // Strictness
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+
+    "resolveJsonModule": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}
