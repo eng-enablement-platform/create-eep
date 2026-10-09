@@ -1,5 +1,16 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
 node_modules/
 dist/
 *.tgz
 .env*
 .DS_Store
+
+# GSD / agent runtime (per-developer, regenerated on demand — not project code)
+.gsd/
+.agents/
+.bg-shell/
+skills-lock.json
+.claude
+.mcp.json
+notes/
