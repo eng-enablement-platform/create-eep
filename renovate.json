@@ -1,0 +1,88 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Europe/London",
+  "schedule": ["on the first day of the month"],
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
+  "branchConcurrentLimit": 3,
+  "labels": ["dependencies"],
+  "assignees": ["hkdevwork123-blip"],
+  "reviewers": ["hkdevwork123-blip"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["on the first day of the month"]
+  },
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "schedule": ["at any time"],
+    "automerge": false
+  },
+  "customManagers": [
+    {
+      "description": "actionlint binary pinned in CI (ACTIONLINT_VERSION env var)",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$",
+      "matchStrings": [
+        "ACTIONLINT_VERSION: (?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "rhysd/actionlint"
+    },
+    {
+      "description": "gitleaks binary pinned in CI (GITLEAKS_VERSION env var)",
+      "customType": "regex",
+      "managerFilePatterns": ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$",
+      "matchStrings": ["GITLEAKS_VERSION: (?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "gitleaks/gitleaks"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "typescript-eslint supports TypeScript <6.1 - hold back TS 7 until it does",
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<6.1"
+    },
+    {
+      "description": "@types/node follows the Node major we run (.nvmrc)",
+      "matchPackageNames": ["@types/node"],
+      "allowedVersions": "<25"
+    },
+    {
+      "description": "Group ESLint major bumps into a single PR (minor/patch go to all non-major)",
+      "matchPackageNames": [
+        "eslint{/,}**",
+        "@eslint/{/,}**",
+        "typescript-eslint",
+        "@stylistic/{/,}**",
+        "@vitest/eslint-plugin"
+      ],
+      "groupName": "ESLint"
+    },
+    {
+      "description": "Group testing package major bumps into a single PR (minor/patch go to all non-major)",
+      "matchPackageNames": [
+        "vitest",
+        "@vitest/coverage-v8",
+        "console-fail-test"
+      ],
+      "groupName": "Testing"
+    },
+    {
+      "description": "Label major version bumps for explicit review - they may contain breaking changes",
+      "matchUpdateTypes": ["major"],
+      "labels": ["dependencies", "major-update"],
+      "automerge": false
+    },
+    {
+      "description": "Batch every minor/patch/digest update (incl. the families above) into one monthly PR. Must stay after the family rules so it overrides their groupNames; majors keep their family PRs",
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "groupName": "all non-major"
+    }
+  ]
+}

@@ -12,6 +12,11 @@ jobs:
     # id-token lets the runner mint the short-lived OIDC token npm exchanges
     # for publish auth. The filename (publish.yml) must match the trusted
     # publisher config on npmjs.com exactly.
+    # The npm-publish environment only allows the main branch (GitHub
+    # Settings -> Environments). Its name is part of the OIDC token, and the
+    # npm trusted publisher requires it - so a run from any other branch, or a
+    # modified copy of this workflow on a branch, cannot publish.
+    environment: npm-publish
     permissions:
       id-token: write
       contents: read

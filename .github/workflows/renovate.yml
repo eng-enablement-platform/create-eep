@@ -1,0 +1,54 @@
+# Self-hosted Renovate, same setup as eep-template-next-app: the org's
+# eep-renovate-runner GitHub App opens PRs under its own bot identity.
+name: Renovate
+
+on:
+  schedule:
+    # 1st of the month, 03:23 UTC. renovate.json's own `schedule` gates when
+    # PRs actually open; this cron only controls how often Renovate wakes up.
+    # Off-peak minute because GitHub delays scheduled runs under load.
+    - cron: '23 3 1 * *'
+  # Manual "run now" button in the Actions tab.
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Ignore renovate.json schedule and open PRs immediately (for testing)'
+        type: boolean
+        default: false
+
+# GITHUB_TOKEN is too restrictive for Renovate; it uses an App token instead.
+# These permissions apply to the workflow itself, not the App token.
+permissions:
+  contents: read
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    name: Renovate
+    runs-on: ubuntu-latest
+    steps:
+      # Short-lived (1h) installation token from the Renovate GitHub App.
+      - name: Get Renovate app token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RENOVATE_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+
+      - name: Self-hosted Renovate
+        uses: renovatebot/github-action@230ce922b08968d0a4f6f70f295601daff09ef1d # v46.3.7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+        env:
+          # Scope Renovate to this repo only - never autodiscover the whole org.
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          # Read-only github.com token for changelog/release-note fetching.
+          RENOVATE_GITHUB_COM_TOKEN: ${{ secrets.RENOVATE_GITHUB_COM_TOKEN }}
+          # When "force" is ticked, null the schedule so PRs open now.
+          RENOVATE_FORCE: ${{ inputs.force && '{"schedule":null}' || '' }}
+          LOG_LEVEL: debug
