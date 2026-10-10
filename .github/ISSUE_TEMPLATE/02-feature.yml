@@ -1,0 +1,25 @@
+name: 🚀 Feature
+description: Suggest a new feature, template or improvement.
+title: '🚀 Feature: <short description>'
+labels: [enhancement]
+body:
+  - type: checkboxes
+    attributes:
+      label: Checklist
+      options:
+        - label: I have [searched existing issues](https://github.com/eng-enablement-platform/create-eep/issues?q=is%3Aissue) and found none that match.
+          required: true
+  - type: textarea
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposal
+      description: What would you like create-eep to do?
+  - type: textarea
+    attributes:
+      label: Additional info
+      description: Alternatives considered, examples from other tools, anything else.

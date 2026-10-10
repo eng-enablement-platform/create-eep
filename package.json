@@ -1,7 +1,7 @@
 {
   "name": "create-eep",
   "version": "0.0.1",
-  "description": "Scaffold new projects from Engineering Enablement Platform (EEP) templates. Under development.",
+  "description": "Scaffold new projects from Engineering Enablement Platform (EEP) templates.",
   "keywords": [
     "create",
     "scaffold",

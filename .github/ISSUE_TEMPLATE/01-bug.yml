@@ -1,0 +1,40 @@
+name: 🐛 Bug
+description: Something went wrong running create-eep.
+title: '🐛 Bug: <short description>'
+labels: [bug]
+body:
+  - type: checkboxes
+    attributes:
+      label: Checklist
+      options:
+        - label: I am using the latest version (`npm create eep@latest`).
+          required: true
+        - label: I have [searched existing issues](https://github.com/eng-enablement-platform/create-eep/issues?q=is%3Aissue) and found none that match.
+          required: true
+  - type: textarea
+    attributes:
+      label: Command
+      description: The exact command you ran.
+      placeholder: npm create eep@latest my-app -- --template web
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Actual
+      description: What happened instead? Include the full output or error.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Environment
+      description: OS, Node version (`node -v`) and package manager + version.
+      placeholder: macOS 26, Node 24.16.0, pnpm 12.10.1
+    validations:
+      required: true

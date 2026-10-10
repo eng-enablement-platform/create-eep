@@ -1,12 +1,26 @@
 # create-eep
 
+[![CI](https://github.com/eng-enablement-platform/create-eep/actions/workflows/ci.yml/badge.svg)](https://github.com/eng-enablement-platform/create-eep/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/create-eep)](https://www.npmjs.com/package/create-eep)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 Scaffold new projects from Engineering Enablement Platform (EEP) templates.
 
-> **Under development.** This version is a placeholder to reserve the package name - it does nothing yet.
+> **Under development.** The CLI does not create projects yet - the foundations (build, tests, CI, publishing) are in place and the scaffolding comes next.
+
+## Usage
 
 ```bash
 npm create eep@latest my-app
 ```
+
+Works with any package manager:
+
+```bash
+pnpm create eep my-app
+```
+
+Requires Node 22.13 or later.
 
 ## Development
 
@@ -57,3 +71,13 @@ Open the coverage report after `pnpm test:coverage`:
 ```bash
 open coverage/index.html
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Agents (and humans) should also follow [AGENTS.md](AGENTS.md).
+
+Found a security issue? Please report it privately - see [SECURITY.md](.github/SECURITY.md).
+
+## License
+
+[MIT](LICENSE)
