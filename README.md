@@ -6,11 +6,17 @@
 
 Scaffold new projects from Engineering Enablement Platform (EEP) templates.
 
-> **Early days.** Templates are copied as-is for now - interactive prompts, template clean-up and dependency install are coming.
+> **Early days.** Templates are copied as-is for now - template clean-up and dependency install are coming.
 
 ## Usage
 
-With `npx`:
+Run it with no arguments and it asks for a project name and template:
+
+```bash
+npx create-eep@latest
+```
+
+Or pass everything up front - with `npx`:
 
 ```bash
 npx create-eep@latest my-app --template next
@@ -45,6 +51,7 @@ npm create eep@latest my-app -- --template https://github.com/org/repo
 | Option                         | Description                                                     |
 | ------------------------------ | --------------------------------------------------------------- |
 | `-t, --template <name-or-url>` | Template name, GitHub repo URL or `gh:org/repo` (default `web`) |
+| `-y, --yes`                    | Skip prompts and use the defaults                               |
 | `-v, --version`                | Print the version                                               |
 | `-h, --help`                   | Show help, including the template list                          |
 

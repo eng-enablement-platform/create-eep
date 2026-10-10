@@ -12,6 +12,29 @@ export class CreateProjectError extends Error {
   override name = 'CreateProjectError';
 }
 
+/**
+ * Checks a project directory can be created - it must not exist yet, since it
+ * could hold someone's work. Separate from the download so it can run before
+ * any spinner, and inside the interactive name prompt.
+ *
+ * @param cwd - The directory the CLI was run from.
+ * @param projectName - The project (and directory) name.
+ * @returns A problem to show, or `undefined` when the directory is free.
+ * @example
+ * ```ts
+ * checkDestination(process.cwd(), 'my-app'); // undefined, or 'Directory already exists: ...'
+ * ```
+ */
+export function checkDestination(
+  cwd: string,
+  projectName: string,
+): string | undefined {
+  const destination = path.resolve(cwd, projectName);
+  return existsSync(destination)
+    ? `Directory already exists: ${destination}`
+    : undefined;
+}
+
 type CreateProjectOptions = {
   projectName: string;
   templateSource: string;
@@ -36,15 +59,16 @@ export async function createProject({
   cwd,
   download,
 }: CreateProjectOptions): Promise<string> {
-  const destination = path.resolve(cwd, projectName);
-
-  // Never write into an existing directory - it could hold someone's work.
-  if (existsSync(destination)) {
-    throw new CreateProjectError(`Directory already exists: ${destination}`);
+  // Re-checked here so the guarantee holds even if a caller skipped it.
+  const destinationProblem = checkDestination(cwd, projectName);
+  if (destinationProblem !== undefined) {
+    throw new CreateProjectError(destinationProblem);
   }
 
   try {
-    const { dir } = await download(templateSource, { dir: destination });
+    const { dir } = await download(templateSource, {
+      dir: path.resolve(cwd, projectName),
+    });
     return dir;
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
