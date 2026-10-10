@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.1.0...v0.2.0) (2026-10-10)
+
+
+### Features
+
+* add interactive prompts ([67d4ba3](https://github.com/eng-enablement-platform/create-eep/commit/67d4ba37d8f9739cf08ef05fc858eebf81c65433))
+
 ## [0.1.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.0.1...v0.1.0) (2026-10-10)
 
 
