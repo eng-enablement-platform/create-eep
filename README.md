@@ -90,6 +90,14 @@ Open the coverage report after `pnpm test:coverage`:
 open coverage/index.html
 ```
 
+## Releasing
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please) - never bump the version or edit `CHANGELOG.md` by hand.
+
+1. Commit to `main` with [conventional commits](https://www.conventionalcommits.org/) - `fix:` means a patch release, `feat:` a minor one (`docs:`, `chore:`, `ci:` and `test:` don't trigger a release).
+2. release-please keeps a single **Release PR** open with the next version and changelog, updating it on every push.
+3. Merge the Release PR to release: it tags the commit, creates a GitHub Release, and the `publish` job publishes to npm via OIDC trusted publishing (with provenance).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Agents (and humans) should also follow [AGENTS.md](AGENTS.md).

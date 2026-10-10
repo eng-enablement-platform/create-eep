@@ -1,13 +1,52 @@
 name: Publish
 
-# Publishes create-eep to npm via OIDC trusted publishing - no NPM_TOKEN.
-# Manual trigger only for now; this moves to release-please once real CI exists.
-# npm rejects re-publishing an existing version, so bump package.json first.
+# Releases and publishes create-eep. Two jobs in one workflow:
+#   1. release-please - on every push to main, opens/updates the Release PR
+#      (version bump + CHANGELOG.md from conventional commits). When that PR is
+#      merged, it tags the commit and creates the GitHub Release instead.
+#   2. publish - only when a release was just created (or on the manual
+#      button): builds and publishes to npm via OIDC trusted publishing.
+#
+# They must live in one workflow: a Release created with GITHUB_TOKEN does not
+# trigger other workflows (GitHub's loop guard), so a separate "on release"
+# workflow would never run. Keeping the filename publish.yml also keeps the npm
+# trusted publisher config unchanged.
 on:
+  push:
+    branches: [main]
+  # Fallback: publish the current version by hand (npm rejects a version that
+  # was already published).
   workflow_dispatch:
 
+# Never run two release/publish passes at once; never cancel one mid-publish.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
+  release-please:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Requires Settings -> Actions -> General -> "Allow GitHub Actions to
+    # create and approve pull requests".
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+    steps:
+      # Config: release-please-config.json + .release-please-manifest.json.
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+
   publish:
+    needs: release-please
+    # !cancelled() lets this run on workflow_dispatch, where release-please is
+    # skipped; otherwise only right after a release was created.
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || needs.release-please.outputs.release_created == 'true') }}
     runs-on: ubuntu-latest
     # id-token lets the runner mint the short-lived OIDC token npm exchanges
     # for publish auth. The filename (publish.yml) must match the trusted
