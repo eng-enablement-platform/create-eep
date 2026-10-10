@@ -18,11 +18,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Installs the pnpm version pinned in package.json "packageManager".
+      - uses: pnpm/action-setup@v4
+
       # registry-url is required even with OIDC - without it npm has no
       # registry context to do the exchange and fails with ENEEDAUTH.
       - uses: actions/setup-node@v5
         with:
-          node-version: 24
+          node-version-file: .nvmrc
+          cache: pnpm
           registry-url: https://registry.npmjs.org
 
       # Trusted publishing needs npm >= 11.5.1; the npm bundled with Node 24
@@ -30,5 +34,18 @@ jobs:
       - name: Update npm
         run: npm install -g npm@latest
 
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # package.json "files" only ships dist/ - publishing without building
+      # first would release an empty package.
+      - name: Build
+        run: pnpm build
+
+      - name: Check package
+        run: pnpm lint:package
+
+      # Publish with npm, not pnpm - this is the OIDC + provenance path that
+      # has been proven end to end.
       - name: Publish
         run: npm publish

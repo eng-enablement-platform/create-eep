@@ -28,6 +28,9 @@ pnpm install
 | `pnpm lint:probe`    | Check the ESLint config still enforces each rule                     |
 | `pnpm format`        | Format all files with Prettier                                       |
 | `pnpm format:check`  | Check formatting without writing changes                             |
+| `pnpm build`         | Bundle the CLI into `dist/index.mjs` with tsdown                     |
+| `pnpm lint:package`  | Check the package is publishable (`bin`, `files`, ...) with publint  |
+| `pnpm smoke`         | Build, pack, install the tarball into a temp project and run it      |
 
 Open the coverage report after `pnpm test:coverage`:
 
