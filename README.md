@@ -10,9 +10,19 @@ Scaffold new projects from Engineering Enablement Platform (EEP) templates.
 
 ## Usage
 
+With `npx`:
+
+```bash
+npx create-eep@latest my-app --template next
+```
+
+Or with `npm create` (pass options after `--` so npm forwards them):
+
 ```bash
 npm create eep@latest my-app -- --template next
 ```
+
+Note the hyphen with `npx` - it's `create-eep`, not `create eep`.
 
 Works with any package manager (`pnpm create eep my-app --template next`, `yarn create eep ...`, `bunx create-eep ...`).
 Requires Node 22.13 or later.
@@ -37,8 +47,6 @@ npm create eep@latest my-app -- --template https://github.com/org/repo
 | `-t, --template <name-or-url>` | Template name, GitHub repo URL or `gh:org/repo` (default `web`) |
 | `-v, --version`                | Print the version                                               |
 | `-h, --help`                   | Show help, including the template list                          |
-
-With `npm create`, pass options after `--` so npm forwards them to create-eep.
 
 ## Development
 
