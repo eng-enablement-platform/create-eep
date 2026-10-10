@@ -13,7 +13,7 @@ export default defineConfig({
   /*
    * tsdown keeps `dependencies` external but bundles anything imported from
    * `devDependencies`. Runtime packages (giget, commander, ...) therefore go in
-   * `devDependencies` so they are compiled into dist/index.mjs and the
+   * `devDependencies` so they are compiled into dist/ and the
    * published package has zero dependencies - `npx create-eep` installs one
    * small package and starts fast.
    */

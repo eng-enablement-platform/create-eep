@@ -41,19 +41,42 @@ cd "$WORK_DIR"
 npm init -y > /dev/null
 npm install --no-audit --no-fund --silent "$TARBALL"
 
-echo "🚀 Running create-eep..."
 # Assert on the bin's stdout only - npm's own notices (on stderr) also mention
-# "create-eep" and would make the check pass even if the bin printed nothing.
-if ! OUTPUT="$(npx --no-install create-eep 2> "$WORK_DIR/stderr.log")"; then
-  echo "❌ The installed bin exited non-zero:"
-  cat "$WORK_DIR/stderr.log"
+# "create-eep" and would make checks pass even if the bin printed nothing.
+run_bin() {
+  if ! OUTPUT="$(npx --no-install create-eep "$@" 2> "$WORK_DIR/stderr.log")"; then
+    echo "❌ create-eep $* exited non-zero:"
+    cat "$WORK_DIR/stderr.log"
+    exit 1
+  fi
+}
+
+EXPECTED_VERSION="$(basename "$TARBALL" .tgz)"
+EXPECTED_VERSION="${EXPECTED_VERSION#create-eep-}"
+
+echo "🚀 create-eep --version"
+run_bin --version
+if [ "$OUTPUT" != "$EXPECTED_VERSION" ]; then
+  echo "❌ Expected version $EXPECTED_VERSION, got: $OUTPUT"
   exit 1
 fi
-echo "$OUTPUT"
 
-if ! grep -q "create-eep" <<< "$OUTPUT"; then
-  echo "❌ Unexpected output from the installed bin."
+echo "🚀 create-eep --help"
+run_bin --help
+if ! grep -q "Templates:" <<< "$OUTPUT"; then
+  echo "❌ --help did not list templates:"
+  echo "$OUTPUT"
   exit 1
 fi
 
-echo "✅ Packed package installs and runs."
+# Real download from GitHub - proves the bundled giget/tar work on this Node
+# version. Set GIGET_AUTH (e.g. a GitHub token) to avoid API rate limits in CI.
+echo "🚀 create-eep smoke-app --template web"
+run_bin smoke-app --template web
+if [ ! -f "$WORK_DIR/smoke-app/index.html" ]; then
+  echo "❌ Scaffolded project is missing index.html:"
+  ls -la "$WORK_DIR/smoke-app" || true
+  exit 1
+fi
+
+echo "✅ Packed package installs, runs and scaffolds a project."

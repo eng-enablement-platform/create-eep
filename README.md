@@ -6,21 +6,39 @@
 
 Scaffold new projects from Engineering Enablement Platform (EEP) templates.
 
-> **Under development.** The CLI does not create projects yet - the foundations (build, tests, CI, publishing) are in place and the scaffolding comes next.
+> **Early days.** Templates are copied as-is for now - interactive prompts, template clean-up and dependency install are coming.
 
 ## Usage
 
 ```bash
-npm create eep@latest my-app
+npm create eep@latest my-app -- --template next
 ```
 
-Works with any package manager:
+Works with any package manager (`pnpm create eep my-app --template next`, `yarn create eep ...`, `bunx create-eep ...`).
+Requires Node 22.13 or later.
+
+### Templates
+
+| Name   | Template                                                                                                                              |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `web`  | [Web dev starter](https://github.com/eng-enablement-platform/eep-template-web-dev-starter) - plain HTML, CSS and JavaScript (default) |
+| `next` | [Next.js full-stack app](https://github.com/eng-enablement-platform/eep-template-next-app)                                            |
+
+Any public GitHub repo also works as a template:
 
 ```bash
-pnpm create eep my-app
+npm create eep@latest my-app -- --template https://github.com/org/repo
 ```
 
-Requires Node 22.13 or later.
+### Options
+
+| Option                         | Description                                                     |
+| ------------------------------ | --------------------------------------------------------------- |
+| `-t, --template <name-or-url>` | Template name, GitHub repo URL or `gh:org/repo` (default `web`) |
+| `-v, --version`                | Print the version                                               |
+| `-h, --help`                   | Show help, including the template list                          |
+
+With `npm create`, pass options after `--` so npm forwards them to create-eep.
 
 ## Development
 
@@ -42,23 +60,23 @@ pnpm install
 SKIP_CHECKS=1 git commit -m "wip: ..."
 ```
 
-| Command               | What it does                                                                 |
-| --------------------- | ---------------------------------------------------------------------------- |
-| `pnpm dev`            | Run the CLI from source (`node src/index.ts` - no build step needed)         |
-| `pnpm test`           | Run the test suite once                                                      |
-| `pnpm test:watch`     | Re-run tests on file changes                                                 |
-| `pnpm test:coverage`  | Run tests with a coverage report (HTML report in `coverage/`)                |
-| `pnpm typecheck`      | Type-check with `tsc` (no output emitted)                                    |
-| `pnpm lint`           | Lint with ESLint (fails on any warning)                                      |
-| `pnpm lint:fix`       | Lint and auto-fix what can be fixed                                          |
-| `pnpm lint:probe`     | Check the ESLint config still enforces each rule                             |
-| `pnpm lint:workflows` | Lint GitHub Actions workflows with actionlint (+ shellcheck on `run:` steps) |
-| `pnpm lint:shell`     | Lint the pre-commit hook and `scripts/*.sh` with shellcheck                  |
-| `pnpm format`         | Format all files with Prettier                                               |
-| `pnpm format:check`   | Check formatting without writing changes                                     |
-| `pnpm build`          | Bundle the CLI into `dist/index.mjs` with tsdown                             |
-| `pnpm lint:package`   | Check the package is publishable (`bin`, `files`, ...) with publint          |
-| `pnpm smoke`          | Build, pack, install the tarball into a temp project and run it              |
+| Command               | What it does                                                                   |
+| --------------------- | ------------------------------------------------------------------------------ |
+| `pnpm dev`            | Run the CLI from source, e.g. `pnpm dev my-app --template web` (no build step) |
+| `pnpm test`           | Run the test suite once                                                        |
+| `pnpm test:watch`     | Re-run tests on file changes                                                   |
+| `pnpm test:coverage`  | Run tests with a coverage report (HTML report in `coverage/`)                  |
+| `pnpm typecheck`      | Type-check with `tsc` (no output emitted)                                      |
+| `pnpm lint`           | Lint with ESLint (fails on any warning)                                        |
+| `pnpm lint:fix`       | Lint and auto-fix what can be fixed                                            |
+| `pnpm lint:probe`     | Check the ESLint config still enforces each rule                               |
+| `pnpm lint:workflows` | Lint GitHub Actions workflows with actionlint (+ shellcheck on `run:` steps)   |
+| `pnpm lint:shell`     | Lint the pre-commit hook and `scripts/*.sh` with shellcheck                    |
+| `pnpm format`         | Format all files with Prettier                                                 |
+| `pnpm format:check`   | Check formatting without writing changes                                       |
+| `pnpm build`          | Bundle the CLI into `dist/index.mjs` with tsdown                               |
+| `pnpm lint:package`   | Check the package is publishable (`bin`, `files`, ...) with publint            |
+| `pnpm smoke`          | Build, pack, install the tarball into a temp project and run it                |
 
 Check workflow YAML locally before pushing - catches typos, broken `${{ }}` expressions, bad `needs:` references and shell bugs in `run:` steps without waiting for a CI run:
 

@@ -58,6 +58,8 @@ export default defineConfig([
         'error',
         { prefer: 'type-imports', disallowTypeAnnotations: false },
       ],
+      // EEP convention (AGENTS.md): `type` by default - overrides the stylistic preset's `interface`.
+      '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_' },

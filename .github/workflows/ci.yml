@@ -81,8 +81,12 @@ jobs:
       - run: pnpm build
       - run: pnpm lint:package
       # Pack, install the tarball into an empty project with npm, run the bin -
-      # the same path `npx create-eep` takes for a user.
+      # the same path `npx create-eep` takes for a user - including a real
+      # template download. The read-only job token avoids GitHub API rate
+      # limits on shared runner IPs.
       - run: pnpm smoke
+        env:
+          GIGET_AUTH: ${{ github.token }}
 
   engines:
     name: Engines (lowest supported Node)
@@ -100,6 +104,8 @@ jobs:
           node-version: 22.13.0
       - name: Install and run the packed package on Node 22.13
         run: bash scripts/smoke-pack.sh --tarball "$RUNNER_TEMP"/create-eep-*.tgz
+        env:
+          GIGET_AUTH: ${{ github.token }}
 
   security:
     name: Security scan
