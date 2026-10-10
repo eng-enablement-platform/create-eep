@@ -30,6 +30,31 @@ fi
 echo '🔑 Scanning staged changes for secrets...'
 gitleaks protect --staged --no-banner || fail
 
+# ── GitHub Actions workflows ───────────────────────────────────────────────
+# Workflow mistakes otherwise only show up after a push. actionlint checks
+# structure, ${{ }} expressions, action inputs and (via shellcheck) every
+# `run:` script. Install: brew install actionlint shellcheck
+if staged_matches '^\.github/'; then
+  if ! command -v actionlint > /dev/null 2>&1; then
+    echo '⚙️❌ actionlint is not installed. Fix: brew install actionlint shellcheck'
+    exit 1
+  fi
+  echo '⚙️ Workflows changed - running actionlint...'
+  pnpm --silent lint:workflows || fail
+fi
+
+# ── Shell scripts ──────────────────────────────────────────────────────────
+# This hook runs under `sh -e` (dash on Linux), so bash-isms fail silently
+# there rather than on macOS - shellcheck catches them up front.
+if staged_matches '\.sh$|^\.husky/'; then
+  if ! command -v shellcheck > /dev/null 2>&1; then
+    echo '🐚❌ shellcheck is not installed. Fix: brew install shellcheck'
+    exit 1
+  fi
+  echo '🐚 Shell scripts changed - running shellcheck...'
+  pnpm --silent lint:shell || fail
+fi
+
 # ── Dependency vulnerabilities ─────────────────────────────────────────────
 # Only when a manifest or lockfile changes, in any directory. New CVEs against
 # unchanged dependencies are caught by CI and Renovate instead, so they don't

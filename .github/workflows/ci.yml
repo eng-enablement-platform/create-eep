@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch / PR cancels the run in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only by default; no job here needs to write.
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/prepare
+      - run: pnpm lint
+      # Proves each ESLint rule still fires (guards against silent config drift).
+      - run: pnpm lint:probe
+
+      # Pinned binary with a checksum check. shellcheck is preinstalled on
+      # ubuntu-latest, so actionlint also lints every `run:` script with it.
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -sSfLO "$base/$archive"
+          curl -sSfL "$base/actionlint_${ACTIONLINT_VERSION}_checksums.txt" | grep " $archive\$" | sha256sum --check -
+          tar -xzf "$archive" actionlint
+          sudo mv actionlint /usr/local/bin/
+      - run: pnpm lint:workflows
+      - run: pnpm lint:shell
+
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/prepare
+      - run: pnpm format:check
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/prepare
+      - run: pnpm typecheck
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/prepare
+      - run: pnpm test:coverage
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: coverage/
+          retention-days: 7
+
+  build:
+    name: Build + package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/prepare
+      - run: pnpm build
+      - run: pnpm lint:package
+      # Pack, install the tarball into an empty project with npm, run the bin -
+      # the same path `npx create-eep` takes for a user.
+      - run: pnpm smoke
+
+  engines:
+    name: Engines (lowest supported Node)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/prepare
+      - name: Build and pack on the dev Node version
+        run: |
+          pnpm build
+          pnpm pack --pack-destination "$RUNNER_TEMP"
+      # Must match the lowest version in package.json "engines".
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.13.0
+      - name: Install and run the packed package on Node 22.13
+        run: bash scripts/smoke-pack.sh --tarball "$RUNNER_TEMP"/create-eep-*.tgz
+
+  security:
+    name: Security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history so gitleaks scans every commit, not just the latest.
+          fetch-depth: 0
+
+      # Flags mirror the pre-commit hook so local and CI scans agree.
+      # TRIVY_INCLUDE_DEV_DEPS is required: runtime packages live in
+      # devDependencies because tsdown bundles them into dist/, and Trivy skips
+      # dev deps by default - without it the published code is never scanned.
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_DETECTION_PRIORITY: comprehensive
+          TRIVY_INCLUDE_DEV_DEPS: 'true'
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          exit-code: 1
+          format: table
+
+      # Pinned binary with a checksum check, rather than gitleaks-action (which
+      # needs a paid licence for organisation accounts).
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          cd "$RUNNER_TEMP"
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLO "$base/$archive"
+          curl -sSfL "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt" | grep " $archive\$" | sha256sum --check -
+          tar -xzf "$archive" gitleaks
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Run gitleaks secret scan
+        run: gitleaks git --no-banner --redact

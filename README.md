@@ -12,10 +12,10 @@ npm create eep@latest my-app
 
 Requires Node 24 (see `.nvmrc`) and pnpm (version pinned in `package.json` - Corepack or pnpm itself will switch to it automatically).
 
-The pre-commit hook also needs [gitleaks](https://github.com/gitleaks/gitleaks) (secret scanning) and [Trivy](https://trivy.dev) (dependency vulnerabilities):
+The pre-commit hook also needs [gitleaks](https://github.com/gitleaks/gitleaks) (secret scanning), [Trivy](https://trivy.dev) (dependency vulnerabilities), [actionlint](https://github.com/rhysd/actionlint) (GitHub Actions workflows) and [shellcheck](https://www.shellcheck.net) (shell scripts):
 
 ```bash
-brew install gitleaks trivy
+brew install gitleaks trivy actionlint shellcheck
 ```
 
 ```bash
@@ -28,21 +28,29 @@ pnpm install
 SKIP_CHECKS=1 git commit -m "wip: ..."
 ```
 
-| Command              | What it does                                                         |
-| -------------------- | -------------------------------------------------------------------- |
-| `pnpm dev`           | Run the CLI from source (`node src/index.ts` - no build step needed) |
-| `pnpm test`          | Run the test suite once                                              |
-| `pnpm test:watch`    | Re-run tests on file changes                                         |
-| `pnpm test:coverage` | Run tests with a coverage report (HTML report in `coverage/`)        |
-| `pnpm typecheck`     | Type-check with `tsc` (no output emitted)                            |
-| `pnpm lint`          | Lint with ESLint (fails on any warning)                              |
-| `pnpm lint:fix`      | Lint and auto-fix what can be fixed                                  |
-| `pnpm lint:probe`    | Check the ESLint config still enforces each rule                     |
-| `pnpm format`        | Format all files with Prettier                                       |
-| `pnpm format:check`  | Check formatting without writing changes                             |
-| `pnpm build`         | Bundle the CLI into `dist/index.mjs` with tsdown                     |
-| `pnpm lint:package`  | Check the package is publishable (`bin`, `files`, ...) with publint  |
-| `pnpm smoke`         | Build, pack, install the tarball into a temp project and run it      |
+| Command               | What it does                                                                 |
+| --------------------- | ---------------------------------------------------------------------------- |
+| `pnpm dev`            | Run the CLI from source (`node src/index.ts` - no build step needed)         |
+| `pnpm test`           | Run the test suite once                                                      |
+| `pnpm test:watch`     | Re-run tests on file changes                                                 |
+| `pnpm test:coverage`  | Run tests with a coverage report (HTML report in `coverage/`)                |
+| `pnpm typecheck`      | Type-check with `tsc` (no output emitted)                                    |
+| `pnpm lint`           | Lint with ESLint (fails on any warning)                                      |
+| `pnpm lint:fix`       | Lint and auto-fix what can be fixed                                          |
+| `pnpm lint:probe`     | Check the ESLint config still enforces each rule                             |
+| `pnpm lint:workflows` | Lint GitHub Actions workflows with actionlint (+ shellcheck on `run:` steps) |
+| `pnpm lint:shell`     | Lint the pre-commit hook and `scripts/*.sh` with shellcheck                  |
+| `pnpm format`         | Format all files with Prettier                                               |
+| `pnpm format:check`   | Check formatting without writing changes                                     |
+| `pnpm build`          | Bundle the CLI into `dist/index.mjs` with tsdown                             |
+| `pnpm lint:package`   | Check the package is publishable (`bin`, `files`, ...) with publint          |
+| `pnpm smoke`          | Build, pack, install the tarball into a temp project and run it              |
+
+Check workflow YAML locally before pushing - catches typos, broken `${{ }}` expressions, bad `needs:` references and shell bugs in `run:` steps without waiting for a CI run:
+
+```bash
+pnpm lint:workflows
+```
 
 Open the coverage report after `pnpm test:coverage`:
 

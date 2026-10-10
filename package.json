@@ -57,7 +57,9 @@
     "build": "tsdown",
     "lint:package": "publint",
     "smoke": "bash scripts/smoke-pack.sh",
-    "prepare": "husky"
+    "prepare": "husky",
+    "lint:workflows": "actionlint && echo '✅ Workflows OK'",
+    "lint:shell": "shellcheck -s sh .husky/pre-commit && shellcheck scripts/*.sh && echo '✅ Shell scripts OK'"
   },
   "bin": {
     "create-eep": "./dist/index.mjs"

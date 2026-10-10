@@ -7,6 +7,10 @@
 # runtime import that was left external instead of bundled.
 #
 # Run manually: `pnpm smoke`
+#
+# Pass an existing tarball to skip the build + pack step, e.g. to pack on one
+# Node version and test the install on another (the CI engines job):
+#   bash scripts/smoke-pack.sh --tarball /path/to/create-eep-x.y.z.tgz
 
 set -euo pipefail
 
@@ -16,10 +20,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "📦 Building and packing..."
-pnpm --silent build > /dev/null
-pnpm pack --pack-destination "$WORK_DIR" > /dev/null
-TARBALL="$(ls "$WORK_DIR"/create-eep-*.tgz)"
+if [ "${1:-}" = "--tarball" ]; then
+  TARBALL="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
+  echo "📦 Using existing tarball (Node $(node --version))..."
+else
+  echo "📦 Building and packing..."
+  pnpm --silent build > /dev/null
+  pnpm pack --pack-destination "$WORK_DIR" > /dev/null
+  TARBALL="$(ls "$WORK_DIR"/create-eep-*.tgz)"
+fi
 
 # Drop the npm_config_* variables pnpm exports to its scripts, so npm behaves
 # as it would on a user's machine.
