@@ -1,0 +1,83 @@
+# Pre-commit checks, adapted from eep-template-next-app.
+#
+# Husky 9 runs this file with `sh -e`, ignoring any shebang - so it must stay
+# POSIX sh (no bash-isms like `&>`, `[[ ]]` or `set -o pipefail`).
+#
+# Escape hatch: `SKIP_CHECKS=1 git commit ...` skips the heavy checks
+# (typecheck, tests, build) for WIP / TDD-red commits. Secret scanning,
+# Trivy, lint probes and lint-staged always run.
+
+fail() {
+  echo ''
+  echo '🔨❌ Pre-commit checks failed - fix the errors above and commit again.'
+  exit 1
+}
+
+# Whether any staged path matches the given extended regex.
+staged_matches() {
+  git diff --cached --name-only | grep -qE "$1"
+}
+
+echo '🏗️👷 Running pre-commit checks...'
+
+# ── Secret scanning ────────────────────────────────────────────────────────
+# Staged files only, so it is fast. The repo is public and dist/ is published
+# to npm, so a leaked token would be public twice over. Install: brew install gitleaks
+if ! command -v gitleaks > /dev/null 2>&1; then
+  echo '🔑❌ gitleaks is not installed. Fix: brew install gitleaks'
+  exit 1
+fi
+echo '🔑 Scanning staged changes for secrets...'
+gitleaks protect --staged --no-banner || fail
+
+# ── Dependency vulnerabilities ─────────────────────────────────────────────
+# Only when a manifest or lockfile changes, in any directory. New CVEs against
+# unchanged dependencies are caught by CI and Renovate instead, so they don't
+# block unrelated commits. Install: brew install trivy
+#
+# --include-dev-deps is required: runtime packages live in devDependencies
+# because tsdown bundles them into dist/ (see tsdown.config.ts). Trivy skips
+# dev deps by default, so without it the code we publish is never scanned.
+if staged_matches '(^|/)(package\.json|pnpm-lock\.yaml)$'; then
+  if ! command -v trivy > /dev/null 2>&1; then
+    echo '🔐❌ trivy is not installed. Fix: brew install trivy'
+    exit 1
+  fi
+  echo '🔐 Dependencies changed - running Trivy...'
+  trivy fs --scanners vuln --ignore-unfixed --detection-priority comprehensive \
+    --disable-telemetry --skip-version-check --severity HIGH,CRITICAL \
+    --include-dev-deps --exit-code 1 --quiet . || fail
+else
+  echo '🔐 Skipping Trivy (no dependency changes)'
+fi
+
+# ── ESLint config probes ───────────────────────────────────────────────────
+# Only when the lint config or custom rules change - guards against a rule
+# silently no longer firing after a config tweak or plugin upgrade.
+if staged_matches '^(eslint\.config\.ts|eslint-rules/)'; then
+  echo '🧪 ESLint config changed - running lint probes...'
+  pnpm --silent lint:probe || fail
+fi
+
+# ── Lint + format staged files ─────────────────────────────────────────────
+echo '📝 Linting and formatting staged files...'
+pnpm exec lint-staged || fail
+
+# ── Heavy checks ───────────────────────────────────────────────────────────
+# Typecheck, tests, build and package lint - only when code or config that
+# affects them changed, and never with SKIP_CHECKS=1.
+if [ "${SKIP_CHECKS:-}" = '1' ]; then
+  echo '⏭️  SKIP_CHECKS=1 - skipping typecheck, tests and build'
+elif staged_matches '\.(ts|mts|js|mjs)$|^(package\.json|tsconfig\.json)$'; then
+  echo '🔬 Type-checking...'
+  pnpm --silent typecheck || fail
+  echo '💪 Running tests...'
+  pnpm --silent test || fail
+  echo '📦 Building and checking the package...'
+  pnpm --silent build > /dev/null || fail
+  pnpm --silent lint:package || fail
+else
+  echo '🏎️  No code changes - skipping typecheck, tests and build'
+fi
+
+echo '✅ All checks passed!'

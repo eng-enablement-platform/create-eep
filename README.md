@@ -12,8 +12,20 @@ npm create eep@latest my-app
 
 Requires Node 24 (see `.nvmrc`) and pnpm (version pinned in `package.json` - Corepack or pnpm itself will switch to it automatically).
 
+The pre-commit hook also needs [gitleaks](https://github.com/gitleaks/gitleaks) (secret scanning) and [Trivy](https://trivy.dev) (dependency vulnerabilities):
+
+```bash
+brew install gitleaks trivy
+```
+
 ```bash
 pnpm install
+```
+
+`pnpm install` also sets up the Husky pre-commit hook. On every commit it scans staged files for secrets, runs Trivy when dependencies change, lints and formats staged files, and - when code changes - runs typecheck, tests and the build. For a WIP or TDD-red commit, skip the typecheck/tests/build step (secret scanning and linting still run):
+
+```bash
+SKIP_CHECKS=1 git commit -m "wip: ..."
 ```
 
 | Command              | What it does                                                         |
