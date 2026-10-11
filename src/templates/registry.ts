@@ -10,19 +10,19 @@ export type Template = {
 
 export const TEMPLATES: readonly Template[] = [
   {
-    name: 'web',
+    name: 'web-dev-starter',
     description: 'Web dev starter - plain HTML, CSS and JavaScript',
     source: 'gh:eng-enablement-platform/eep-template-web-dev-starter',
   },
   {
-    name: 'next',
+    name: 'next-app',
     description: 'Next.js full-stack app',
     source: 'gh:eng-enablement-platform/eep-template-next-app',
   },
 ];
 
 // Used when no `--template` is given, until interactive prompts land.
-export const DEFAULT_TEMPLATE_NAME = 'web';
+export const DEFAULT_TEMPLATE_NAME = 'web-dev-starter';
 
 const GITHUB_URL_PATTERN =
   /^https?:\/\/(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/;
@@ -35,7 +35,7 @@ const GITHUB_URL_PATTERN =
  * @returns The giget source, or `undefined` when the input is not recognised.
  * @example
  * ```ts
- * resolveTemplateSource('next'); // 'gh:eng-enablement-platform/eep-template-next-app'
+ * resolveTemplateSource('next-app'); // 'gh:eng-enablement-platform/eep-template-next-app'
  * resolveTemplateSource('https://github.com/org/repo.git'); // 'gh:org/repo'
  * ```
  */

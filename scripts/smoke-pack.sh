@@ -71,11 +71,16 @@ fi
 
 # Real download from GitHub - proves the bundled giget/tar work on this Node
 # version. Set GIGET_AUTH (e.g. a GitHub token) to avoid API rate limits in CI.
-echo "🚀 create-eep smoke-app --template web"
-run_bin smoke-app --template web
+echo "🚀 create-eep smoke-app --template web-dev-starter"
+run_bin smoke-app --template web-dev-starter
 if [ ! -f "$WORK_DIR/smoke-app/index.html" ]; then
   echo "❌ Scaffolded project is missing index.html:"
   ls -la "$WORK_DIR/smoke-app" || true
+  exit 1
+fi
+# The template's .eep/ setup folder must never reach a generated project.
+if [ -e "$WORK_DIR/smoke-app/.eep" ]; then
+  echo "❌ Scaffolded project still contains the template's .eep/ folder"
   exit 1
 fi
 

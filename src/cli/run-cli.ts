@@ -31,8 +31,11 @@ type CliOptions = { template: string; yes?: boolean };
 // Exit code for a user cancel (Ctrl+C) - the shell convention for SIGINT.
 const CANCELLED_EXIT_CODE = 130;
 
+// Pad names to the longest one so descriptions line up in --help and errors.
+const nameWidth =
+  Math.max(...TEMPLATES.map((template) => template.name.length)) + 2;
 const templateList = TEMPLATES.map(
-  (template) => `  ${template.name.padEnd(6)}${template.description}`,
+  (template) => `  ${template.name.padEnd(nameWidth)}${template.description}`,
 ).join('\n');
 
 /**
@@ -69,7 +72,7 @@ export async function runCli(
     .option('-y, --yes', 'skip prompts and use the defaults')
     .addHelpText(
       'after',
-      `\nTemplates:\n${templateList}\n\nRun without arguments in a terminal to be asked instead.\n\nExample:\n  npx create-eep@latest my-app --template next`,
+      `\nTemplates:\n${templateList}\n\nRun without arguments in a terminal to be asked instead.\n\nExample:\n  npx create-eep@latest my-app --template next-app`,
     )
     // Throw instead of calling process.exit, and write through the injected streams.
     .exitOverride()
@@ -143,10 +146,13 @@ export async function runCli(
   }
 
   // ── Scaffold ─────────────────────────────────────────────────────────────
-  const task = ui.startTask(`Downloading the "${template}" template`);
+  const task = ui.startTask(
+    `Downloading and setting up the "${template}" template`,
+  );
   try {
     const dir = await createProject({
       projectName,
+      templateName: template,
       templateSource,
       cwd,
       download,
@@ -156,7 +162,7 @@ export async function runCli(
     return 0;
   } catch (error) {
     if (error instanceof CreateProjectError) {
-      task.fail('Download failed');
+      task.fail('Setup failed');
       ui.error(error.message);
       return 1;
     }

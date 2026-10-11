@@ -15,7 +15,7 @@ body:
     attributes:
       label: Command
       description: The exact command you ran.
-      placeholder: npm create eep@latest my-app -- --template web
+      placeholder: npm create eep@latest my-app -- --template web-dev-starter
       render: shell
     validations:
       required: true

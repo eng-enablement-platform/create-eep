@@ -1,5 +1,9 @@
 import { existsSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import path from 'node:path';
+
+import { ManifestError } from '../templates/manifest.ts';
+import { applyManifest } from './apply-manifest.ts';
 
 /** Downloads a template into a directory - giget's `downloadTemplate` in production. */
 export type Downloader = (
@@ -37,16 +41,20 @@ export function checkDestination(
 
 type CreateProjectOptions = {
   projectName: string;
+  /** Shown in the starter README, e.g. "web-dev-starter" or the GitHub URL. */
+  templateName: string;
   templateSource: string;
   cwd: string;
   download: Downloader;
 };
 
 /**
- * Downloads a template into a new `<cwd>/<projectName>` directory. The
- * downloader is injected so tests can check the decisions without a network.
+ * Downloads a template into a new `<cwd>/<projectName>` directory and applies
+ * its `.eep/template.json` (if any). The downloader is injected so tests can
+ * check the decisions without a network. If setup fails after the download,
+ * the half-made directory is removed.
  *
- * @param options - Project name, giget source, working directory and downloader.
+ * @param options - Project and template names, giget source, working directory and downloader.
  * @returns The absolute path of the created project.
  * @example
  * ```ts
@@ -55,6 +63,7 @@ type CreateProjectOptions = {
  */
 export async function createProject({
   projectName,
+  templateName,
   templateSource,
   cwd,
   download,
@@ -65,15 +74,33 @@ export async function createProject({
     throw new CreateProjectError(destinationProblem);
   }
 
+  let dir: string;
   try {
-    const { dir } = await download(templateSource, {
+    ({ dir } = await download(templateSource, {
       dir: path.resolve(cwd, projectName),
-    });
-    return dir;
+    }));
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
     throw new CreateProjectError(
-      `Could not download template "${templateSource}": ${reason}`,
+      `Could not download template "${templateSource}": ${describe(error)}`,
     );
   }
+
+  try {
+    await applyManifest({ projectDir: dir, projectName, templateName });
+  } catch (error) {
+    // We created this directory moments ago, so it is safe to remove.
+    await rm(dir, { recursive: true, force: true });
+    const reason =
+      error instanceof ManifestError
+        ? `the template's .eep/template.json is invalid: ${error.message}`
+        : describe(error);
+    throw new CreateProjectError(
+      `Could not set up the project - ${reason} Nothing was created.`,
+    );
+  }
+
+  return dir;
 }
+
+const describe = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);

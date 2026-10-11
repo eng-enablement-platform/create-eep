@@ -6,7 +6,7 @@
 
 Scaffold new projects from Engineering Enablement Platform (EEP) templates.
 
-> **Early days.** Templates are copied as-is for now - template clean-up and dependency install are coming.
+> **Early days.** Optional template features (e.g. the Next.js docs site) and dependency install are coming.
 
 ## Usage
 
@@ -19,26 +19,26 @@ npx create-eep@latest
 Or pass everything up front - with `npx`:
 
 ```bash
-npx create-eep@latest my-app --template next
+npx create-eep@latest my-app --template next-app
 ```
 
 Or with `npm create` (pass options after `--` so npm forwards them):
 
 ```bash
-npm create eep@latest my-app -- --template next
+npm create eep@latest my-app -- --template next-app
 ```
 
 Note the hyphen with `npx` - it's `create-eep`, not `create eep`.
 
-Works with any package manager (`pnpm create eep my-app --template next`, `yarn create eep ...`, `bunx create-eep ...`).
+Works with any package manager (`pnpm create eep my-app --template next-app`, `yarn create eep ...`, `bunx create-eep ...`).
 Requires Node 22.13 or later.
 
 ### Templates
 
-| Name   | Template                                                                                                                              |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `web`  | [Web dev starter](https://github.com/eng-enablement-platform/eep-template-web-dev-starter) - plain HTML, CSS and JavaScript (default) |
-| `next` | [Next.js full-stack app](https://github.com/eng-enablement-platform/eep-template-next-app)                                            |
+| Name              | Template                                                                                                                              |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `web-dev-starter` | [Web dev starter](https://github.com/eng-enablement-platform/eep-template-web-dev-starter) - plain HTML, CSS and JavaScript (default) |
+| `next-app`        | [Next.js full-stack app](https://github.com/eng-enablement-platform/eep-template-next-app)                                            |
 
 Any public GitHub repo also works as a template:
 
@@ -48,12 +48,34 @@ npm create eep@latest my-app -- --template https://github.com/org/repo
 
 ### Options
 
-| Option                         | Description                                                     |
-| ------------------------------ | --------------------------------------------------------------- |
-| `-t, --template <name-or-url>` | Template name, GitHub repo URL or `gh:org/repo` (default `web`) |
-| `-y, --yes`                    | Skip prompts and use the defaults                               |
-| `-v, --version`                | Print the version                                               |
-| `-h, --help`                   | Show help, including the template list                          |
+| Option                         | Description                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `-t, --template <name-or-url>` | Template name, GitHub repo URL or `gh:org/repo` (default `web-dev-starter`) |
+| `-y, --yes`                    | Skip prompts and use the defaults                                           |
+| `-v, --version`                | Print the version                                                           |
+| `-h, --help`                   | Show help, including the template list                                      |
+
+## For template authors
+
+A template can include an `.eep/` folder that tells create-eep how to turn it into a project.
+create-eep applies it after downloading and then deletes `.eep/`, so it never reaches generated projects.
+Templates without one (including any GitHub repo) are copied as-is.
+
+`.eep/template.json`:
+
+```json
+{
+  "version": 1,
+  "remove": ["path/only-needed-to-maintain-the-template/"],
+  "readme": "README.md"
+}
+```
+
+- `remove` - paths always deleted from generated projects (must stay inside the project)
+- `readme` - a starter README inside `.eep/` that replaces the template's own. `{{projectName}}` and `{{templateName}}` are filled in
+- `package.json` `name` (if present) is set to the project name
+
+If setup fails, the half-made project directory is removed.
 
 ## Development
 
@@ -75,23 +97,23 @@ pnpm install
 SKIP_CHECKS=1 git commit -m "wip: ..."
 ```
 
-| Command               | What it does                                                                   |
-| --------------------- | ------------------------------------------------------------------------------ |
-| `pnpm dev`            | Run the CLI from source, e.g. `pnpm dev my-app --template web` (no build step) |
-| `pnpm test`           | Run the test suite once                                                        |
-| `pnpm test:watch`     | Re-run tests on file changes                                                   |
-| `pnpm test:coverage`  | Run tests with a coverage report (HTML report in `coverage/`)                  |
-| `pnpm typecheck`      | Type-check with `tsc` (no output emitted)                                      |
-| `pnpm lint`           | Lint with ESLint (fails on any warning)                                        |
-| `pnpm lint:fix`       | Lint and auto-fix what can be fixed                                            |
-| `pnpm lint:probe`     | Check the ESLint config still enforces each rule                               |
-| `pnpm lint:workflows` | Lint GitHub Actions workflows with actionlint (+ shellcheck on `run:` steps)   |
-| `pnpm lint:shell`     | Lint the pre-commit hook and `scripts/*.sh` with shellcheck                    |
-| `pnpm format`         | Format all files with Prettier                                                 |
-| `pnpm format:check`   | Check formatting without writing changes                                       |
-| `pnpm build`          | Bundle the CLI into `dist/index.mjs` with tsdown                               |
-| `pnpm lint:package`   | Check the package is publishable (`bin`, `files`, ...) with publint            |
-| `pnpm smoke`          | Build, pack, install the tarball into a temp project and run it                |
+| Command               | What it does                                                                               |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| `pnpm dev`            | Run the CLI from source, e.g. `pnpm dev my-app --template web-dev-starter` (no build step) |
+| `pnpm test`           | Run the test suite once                                                                    |
+| `pnpm test:watch`     | Re-run tests on file changes                                                               |
+| `pnpm test:coverage`  | Run tests with a coverage report (HTML report in `coverage/`)                              |
+| `pnpm typecheck`      | Type-check with `tsc` (no output emitted)                                                  |
+| `pnpm lint`           | Lint with ESLint (fails on any warning)                                                    |
+| `pnpm lint:fix`       | Lint and auto-fix what can be fixed                                                        |
+| `pnpm lint:probe`     | Check the ESLint config still enforces each rule                                           |
+| `pnpm lint:workflows` | Lint GitHub Actions workflows with actionlint (+ shellcheck on `run:` steps)               |
+| `pnpm lint:shell`     | Lint the pre-commit hook and `scripts/*.sh` with shellcheck                                |
+| `pnpm format`         | Format all files with Prettier                                                             |
+| `pnpm format:check`   | Check formatting without writing changes                                                   |
+| `pnpm build`          | Bundle the CLI into `dist/index.mjs` with tsdown                                           |
+| `pnpm lint:package`   | Check the package is publishable (`bin`, `files`, ...) with publint                        |
+| `pnpm smoke`          | Build, pack, install the tarball into a temp project and run it                            |
 
 Check workflow YAML locally before pushing - catches typos, broken `${{ }}` expressions, bad `needs:` references and shell bugs in `run:` steps without waiting for a CI run:
 

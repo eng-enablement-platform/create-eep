@@ -1,4 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -75,8 +82,8 @@ describe(runCli, () => {
 
     it('lists the built-in templates in --help', async () => {
       expect(await run(['--help'])).toBe(0);
-      expect(output.stdout).toContain('web');
-      expect(output.stdout).toContain('next');
+      expect(output.stdout).toContain('web-dev-starter');
+      expect(output.stdout).toContain('next-app');
       expect(download).not.toHaveBeenCalled();
     });
 
@@ -95,7 +102,7 @@ describe(runCli, () => {
     it('fails on an unknown template and lists the available ones', async () => {
       expect(await run(['my-app', '--template', 'nope'])).toBe(1);
       expect(output.stderr).toContain('Unknown template "nope"');
-      expect(output.stderr).toContain('next');
+      expect(output.stderr).toContain('next-app');
       expect(download).not.toHaveBeenCalled();
     });
 
@@ -117,7 +124,7 @@ describe(runCli, () => {
     });
 
     it('downloads the chosen built-in template', async () => {
-      expect(await run(['my-app', '-t', 'next'])).toBe(0);
+      expect(await run(['my-app', '-t', 'next-app'])).toBe(0);
       expect(download).toHaveBeenCalledWith(
         'gh:eng-enablement-platform/eep-template-next-app',
         expect.anything(),
@@ -138,6 +145,36 @@ describe(runCli, () => {
       expect(output.stderr).toContain('Could not download template');
       expect(output.stderr).toContain('404 Not Found');
     });
+
+    // Simulates giget writing a template that has a .eep/ manifest.
+    const downloadTemplateWithManifest = (manifest: string) =>
+      download.mockImplementationOnce((_source, { dir }) => {
+        mkdirSync(path.join(dir, '.eep'), { recursive: true });
+        writeFileSync(path.join(dir, '.eep', 'template.json'), manifest);
+        writeFileSync(path.join(dir, '.eep', 'README.md'), '# {{projectName}}');
+        return Promise.resolve({ dir });
+      });
+
+    it('applies the template manifest after downloading', async () => {
+      downloadTemplateWithManifest(
+        JSON.stringify({ version: 1, readme: 'README.md' }),
+      );
+
+      expect(await run(['my-app'])).toBe(0);
+      const projectDir = path.join(cwd, 'my-app');
+      expect(readFileSync(path.join(projectDir, 'README.md'), 'utf8')).toBe(
+        '# my-app',
+      );
+      expect(existsSync(path.join(projectDir, '.eep'))).toBe(false);
+    });
+
+    it('removes the half-made project when the manifest is invalid', async () => {
+      downloadTemplateWithManifest(JSON.stringify({ version: 99 }));
+
+      expect(await run(['my-app'])).toBe(1);
+      expect(output.stderr).toContain('.eep/template.json is invalid');
+      expect(existsSync(path.join(cwd, 'my-app'))).toBe(false);
+    });
   });
 
   describe('interactive (terminal)', () => {
@@ -151,7 +188,10 @@ describe(runCli, () => {
       });
 
     it('asks for the name and template when neither is given', async () => {
-      const { ui } = createFakeUi({ projectName: 'my-app', template: 'next' });
+      const { ui } = createFakeUi({
+        projectName: 'my-app',
+        template: 'next-app',
+      });
 
       expect(await run([], ui)).toBe(0);
       expect(ui.askProjectName).toHaveBeenCalledOnce();
@@ -164,7 +204,7 @@ describe(runCli, () => {
     });
 
     it('only asks for the template when the name is given', async () => {
-      const { ui } = createFakeUi({ template: 'web' });
+      const { ui } = createFakeUi({ template: 'web-dev-starter' });
 
       expect(await run(['my-app'], ui)).toBe(0);
       expect(ui.askProjectName).not.toHaveBeenCalled();
@@ -174,7 +214,7 @@ describe(runCli, () => {
     it('asks nothing when the name and template are both given', async () => {
       const { ui } = createFakeUi({});
 
-      expect(await run(['my-app', '-t', 'next'], ui)).toBe(0);
+      expect(await run(['my-app', '-t', 'next-app'], ui)).toBe(0);
       expect(ui.askProjectName).not.toHaveBeenCalled();
       expect(ui.askTemplate).not.toHaveBeenCalled();
     });
@@ -214,7 +254,10 @@ describe(runCli, () => {
 
     it('validates the typed name against the naming rules and existing directories', async () => {
       mkdirSync(path.join(cwd, 'taken'));
-      const { ui } = createFakeUi({ projectName: 'my-app', template: 'web' });
+      const { ui } = createFakeUi({
+        projectName: 'my-app',
+        template: 'web-dev-starter',
+      });
 
       await run([], ui);
       const validate = ui.askProjectName.mock.calls[0]?.[0];
@@ -226,7 +269,7 @@ describe(runCli, () => {
 
     it('reports a failed download through the task and error output', async () => {
       download.mockRejectedValueOnce(new Error('404 Not Found'));
-      const { ui, errors } = createFakeUi({ template: 'web' });
+      const { ui, errors } = createFakeUi({ template: 'web-dev-starter' });
 
       expect(await run(['my-app'], ui)).toBe(1);
       expect(errors.join()).toContain('404 Not Found');
