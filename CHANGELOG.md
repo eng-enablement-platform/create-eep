@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.2.0...v0.3.0) (2026-10-11)
+
+
+### ⚠ BREAKING CHANGES
+
+* templates renamed - web is now web-dev-starter, next is now next-app
+
+### Features
+
+* apply template manifests and rename templates ([cbe0f48](https://github.com/eng-enablement-platform/create-eep/commit/cbe0f48837898a6c16338a89dfc07937a1591cc7))
+
 ## [0.2.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.1.0...v0.2.0) (2026-10-10)
 
 
