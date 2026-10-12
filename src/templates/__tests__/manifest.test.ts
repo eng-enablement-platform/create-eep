@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
+import type { TemplateFeature } from '../manifest.ts';
 import {
   isSafeRelativePath,
   ManifestError,
   parseManifest,
   renderPlaceholders,
+  resolveFeatureFlags,
 } from '../manifest.ts';
 
 describe(parseManifest, () => {
@@ -12,20 +14,31 @@ describe(parseManifest, () => {
     expect(parseManifest({ version: 1 })).toStrictEqual({
       version: 1,
       remove: [],
+      features: [],
     });
   });
 
   it('accepts remove paths and a readme', () => {
     expect(
       parseManifest({ version: 1, remove: ['docs/'], readme: 'README.md' }),
-    ).toStrictEqual({ version: 1, remove: ['docs/'], readme: 'README.md' });
+    ).toStrictEqual({
+      version: 1,
+      remove: ['docs/'],
+      readme: 'README.md',
+      features: [],
+    });
   });
 
   it.each([
     ['a non-object', 'nope', /JSON object/],
     ['an array', [], /JSON object/],
     ['a missing version', {}, /Unsupported manifest version/],
-    ['a newer version', { version: 2 }, /Unsupported manifest version 2/],
+    ['a newer version', { version: 3 }, /Unsupported manifest version 3/],
+    [
+      'features in a version 1 manifest',
+      { version: 1, features: [] },
+      /Unknown manifest field\(s\): features/,
+    ],
     ['an unknown field (typo)', { version: 1, remvoe: [] }, /remvoe/],
     ['a non-array remove', { version: 1, remove: 'docs/' }, /array of paths/],
     [
@@ -42,6 +55,127 @@ describe(parseManifest, () => {
   ])('rejects %s', (_case, content, message) => {
     expect(() => parseManifest(content)).toThrow(ManifestError);
     expect(() => parseManifest(content)).toThrow(message);
+  });
+});
+
+describe('parseManifest - version 2 features', () => {
+  const docs = {
+    id: 'docs',
+    prompt: 'Include the docs site?',
+    default: false,
+    remove: ['docs/'],
+    scripts: ['dev:docs'],
+  };
+
+  it('accepts features and defaults their remove/scripts to empty', () => {
+    expect(
+      parseManifest({
+        version: 2,
+        features: [docs, { id: 'extra', prompt: 'Extra?', default: true }],
+      }).features,
+    ).toStrictEqual([
+      docs,
+      { id: 'extra', prompt: 'Extra?', default: true, remove: [], scripts: [] },
+    ]);
+  });
+
+  it.each([
+    ['non-array features', { features: 'docs' }, /"features" must be an array/],
+    [
+      'a non-object feature',
+      { features: ['docs'] },
+      /features\[0\] must be an object/,
+    ],
+    [
+      'an invalid id',
+      { features: [{ ...docs, id: 'Docs Site' }] },
+      /lowercase/,
+    ],
+    [
+      'a missing prompt',
+      { features: [{ ...docs, prompt: ' ' }] },
+      /needs a "prompt"/,
+    ],
+    [
+      'a non-boolean default',
+      { features: [{ ...docs, default: 'no' }] },
+      /true\/false "default"/,
+    ],
+    [
+      'non-string scripts',
+      { features: [{ ...docs, scripts: [1] }] },
+      /script names/,
+    ],
+    [
+      'an unsafe feature path',
+      { features: [{ ...docs, remove: ['../x'] }] },
+      /features.docs.remove/,
+    ],
+    [
+      'an unknown feature field',
+      { features: [{ ...docs, colour: 'red' }] },
+      /Unknown features\[0\] field\(s\): colour/,
+    ],
+    [
+      'duplicate ids',
+      { features: [docs, docs] },
+      /"docs" is used more than once/,
+    ],
+  ])('rejects %s', (_case, fields, message) => {
+    expect(() => parseManifest({ version: 2, ...fields })).toThrow(message);
+  });
+});
+
+describe(resolveFeatureFlags, () => {
+  const feature = (id: string): TemplateFeature => ({
+    id,
+    prompt: `${id}?`,
+    default: true,
+    remove: [],
+    scripts: [],
+  });
+  const features = [
+    feature('docs'),
+    feature('diagrams'),
+    feature('devcontainer'),
+  ];
+
+  it('leaves every feature undecided without flags', () => {
+    expect(
+      resolveFeatureFlags(features, { with: [], without: [] }),
+    ).toStrictEqual({ choices: {}, undecided: features });
+  });
+
+  it('decides flagged features and leaves the rest undecided', () => {
+    expect(
+      resolveFeatureFlags(features, {
+        with: ['docs'],
+        without: ['devcontainer'],
+      }),
+    ).toStrictEqual({
+      choices: { docs: true, devcontainer: false },
+      undecided: [feature('diagrams')],
+    });
+  });
+
+  it('rejects an unknown extra and lists the ones on offer', () => {
+    expect(() =>
+      resolveFeatureFlags(features, { with: ['docz'], without: [] }),
+    ).toThrow(
+      /Unknown optional extra\(s\): docz. This template offers: docs, diagrams, devcontainer/,
+    );
+  });
+
+  it('explains when the template has no extras at all', () => {
+    expect(() =>
+      resolveFeatureFlags([], { with: [], without: ['docs'] }),
+    ).toThrow(/has no optional extras/);
+  });
+
+  it('rejects the same extra in --with and --without', () => {
+    expect(() =>
+      resolveFeatureFlags(features, { with: ['docs'], without: ['docs'] }),
+    ).toThrow(/Both --with and --without given for: docs/);
   });
 });
 

@@ -2,9 +2,6 @@ import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
-import { ManifestError } from '../templates/manifest.ts';
-import { applyManifest } from './apply-manifest.ts';
-
 /** Downloads a template into a directory - giget's `downloadTemplate` in production. */
 export type Downloader = (
   source: string,
@@ -39,68 +36,56 @@ export function checkDestination(
     : undefined;
 }
 
-type CreateProjectOptions = {
+type DownloadProjectOptions = {
   projectName: string;
-  /** Shown in the starter README, e.g. "web-dev-starter" or the GitHub URL. */
-  templateName: string;
   templateSource: string;
   cwd: string;
   download: Downloader;
 };
 
 /**
- * Downloads a template into a new `<cwd>/<projectName>` directory and applies
- * its `.eep/template.json` (if any). The downloader is injected so tests can
- * check the decisions without a network. If setup fails after the download,
- * the half-made directory is removed.
+ * Downloads a template into a new `<cwd>/<projectName>` directory. The
+ * downloader is injected so tests can check the decisions without a network.
  *
- * @param options - Project and template names, giget source, working directory and downloader.
- * @returns The absolute path of the created project.
+ * @param options - Project name, giget source, working directory and downloader.
+ * @returns The absolute path of the downloaded project.
  * @example
  * ```ts
- * await createProject({ projectName: 'my-app', templateSource: 'gh:org/repo', cwd, download });
+ * const dir = await downloadProject({ projectName: 'my-app', templateSource: 'gh:org/repo', cwd, download });
  * ```
  */
-export async function createProject({
+export async function downloadProject({
   projectName,
-  templateName,
   templateSource,
   cwd,
   download,
-}: CreateProjectOptions): Promise<string> {
+}: DownloadProjectOptions): Promise<string> {
   // Re-checked here so the guarantee holds even if a caller skipped it.
   const destinationProblem = checkDestination(cwd, projectName);
   if (destinationProblem !== undefined) {
     throw new CreateProjectError(destinationProblem);
   }
 
-  let dir: string;
   try {
-    ({ dir } = await download(templateSource, {
+    const { dir } = await download(templateSource, {
       dir: path.resolve(cwd, projectName),
-    }));
+    });
+    return dir;
   } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
     throw new CreateProjectError(
-      `Could not download template "${templateSource}": ${describe(error)}`,
+      `Could not download template "${templateSource}": ${reason}`,
     );
   }
-
-  try {
-    await applyManifest({ projectDir: dir, projectName, templateName });
-  } catch (error) {
-    // We created this directory moments ago, so it is safe to remove.
-    await rm(dir, { recursive: true, force: true });
-    const reason =
-      error instanceof ManifestError
-        ? `the template's .eep/template.json is invalid: ${error.message}`
-        : describe(error);
-    throw new CreateProjectError(
-      `Could not set up the project - ${reason} Nothing was created.`,
-    );
-  }
-
-  return dir;
 }
 
-const describe = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
+/**
+ * Removes a project directory this run created, after a failure or cancel, so
+ * nothing half-made is left behind. Only call it on a directory we just
+ * downloaded - `checkDestination` guarantees it did not exist before.
+ *
+ * @param projectDir - The directory returned by {@link downloadProject}.
+ */
+export async function removeProject(projectDir: string): Promise<void> {
+  await rm(projectDir, { recursive: true, force: true });
+}

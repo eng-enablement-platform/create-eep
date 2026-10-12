@@ -31,6 +31,8 @@ export type Ui = {
     templates: readonly Template[],
     initialValue: string,
   ) => Promise<Answer<string>>;
+  /** Yes/no question - `initialValue` is pre-selected. */
+  confirm: (message: string, initialValue: boolean) => Promise<Answer<boolean>>;
   startTask: (message: string) => Task;
   success: (message: string, nextSteps: readonly string[]) => void;
   error: (message: string) => void;
@@ -75,6 +77,10 @@ export function createClackUi(): Ui {
           })),
         }),
       ),
+    confirm: async (message, initialValue) => {
+      const answer = await prompts.confirm({ message, initialValue });
+      return typeof answer === 'symbol' ? CANCELLED : answer;
+    },
     startTask: (message) => {
       const spinner = prompts.spinner();
       spinner.start(message);
@@ -124,6 +130,7 @@ export function createPlainUi(
     intro: () => undefined,
     askProjectName: noPrompts,
     askTemplate: noPrompts,
+    confirm: noPrompts,
     startTask: (message) => {
       stdout(`${message}...\n`);
       return {

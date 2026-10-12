@@ -4,22 +4,42 @@ import path from 'node:path';
 export const MANIFEST_DIRECTORY = '.eep';
 export const MANIFEST_FILE = 'template.json';
 
-const SUPPORTED_VERSION = 1;
-const KNOWN_KEYS = new Set(['version', 'remove', 'readme']);
+const SUPPORTED_VERSIONS = [1, 2] as const;
+const KNOWN_KEYS: Record<1 | 2, readonly string[]> = {
+  1: ['version', 'remove', 'readme'],
+  2: ['version', 'remove', 'readme', 'features'],
+};
+const FEATURE_KEYS = ['id', 'prompt', 'default', 'remove', 'scripts'];
+const FEATURE_ID_PATTERN = /^[a-z][a-z0-9-]*$/;
 
-/**
- * A template's `.eep/template.json`: what create-eep does after downloading it.
- * Optional features (e.g. a docs site prompt) are added in a later version.
- */
+/** An optional part of a template the user can keep or drop (manifest version 2). */
+export type TemplateFeature = {
+  /** Used with `--with <id>` / `--without <id>`. */
+  id: string;
+  /** Yes/no question asked in a terminal. */
+  prompt: string;
+  /** Used when not asked (CI, `--yes`) and pre-selected when asked. */
+  default: boolean;
+  /** Paths removed when the feature is dropped. */
+  remove: string[];
+  /** package.json scripts removed when the feature is dropped. */
+  scripts: string[];
+};
+
+/** A template's `.eep/template.json`: what create-eep does after downloading it. */
 export type TemplateManifest = {
-  version: 1;
+  version: 1 | 2;
   /** Template-maintenance paths always removed from generated projects. */
   remove: string[];
   /** Starter README inside `.eep/` that replaces the template's own README. */
   readme?: string;
+  features: TemplateFeature[];
 };
 
-/** A manifest problem, worded for the template author. */
+/** Whether each optional feature is kept, by feature id. */
+export type FeatureChoices = Record<string, boolean>;
+
+/** A manifest or feature-selection problem, safe to show the user as-is. */
 export class ManifestError extends Error {
   override name = 'ManifestError';
 }
@@ -44,6 +64,73 @@ export function isSafeRelativePath(relativePath: string): boolean {
   );
 }
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((entry) => typeof entry === 'string');
+
+// Validates a list of paths, naming `field` in the error.
+const parsePaths = (value: unknown, field: string): string[] => {
+  const paths = value ?? [];
+  if (!isStringArray(paths)) {
+    throw new ManifestError(`"${field}" must be an array of paths.`);
+  }
+  const unsafe = paths.filter((entry) => !isSafeRelativePath(entry));
+  if (unsafe.length > 0) {
+    throw new ManifestError(
+      `"${field}" paths must stay inside the project: ${unsafe.join(', ')}`,
+    );
+  }
+  return paths;
+};
+
+const rejectUnknownKeys = (
+  value: Record<string, unknown>,
+  known: readonly string[],
+  where: string,
+): void => {
+  const unknown = Object.keys(value).filter((key) => !known.includes(key));
+  if (unknown.length > 0) {
+    throw new ManifestError(
+      `Unknown ${where} field(s): ${unknown.join(', ')}. Supported: ${known.join(', ')}.`,
+    );
+  }
+};
+
+const parseFeature = (value: unknown, index: number): TemplateFeature => {
+  const where = `features[${String(index)}]`;
+  if (!isObject(value)) {
+    throw new ManifestError(`${where} must be an object.`);
+  }
+  rejectUnknownKeys(value, FEATURE_KEYS, where);
+  const { id, prompt } = value;
+  if (typeof id !== 'string' || !FEATURE_ID_PATTERN.test(id)) {
+    throw new ManifestError(
+      `${where}.id must be lowercase letters, numbers and dashes (e.g. "docs").`,
+    );
+  }
+  if (typeof prompt !== 'string' || prompt.trim() === '') {
+    throw new ManifestError(`Feature "${id}" needs a "prompt" question.`);
+  }
+  if (typeof value.default !== 'boolean') {
+    throw new ManifestError(`Feature "${id}" needs a true/false "default".`);
+  }
+  const scripts = value.scripts ?? [];
+  if (!isStringArray(scripts)) {
+    throw new ManifestError(
+      `Feature "${id}" "scripts" must be an array of script names.`,
+    );
+  }
+  return {
+    id,
+    prompt,
+    default: value.default,
+    remove: parsePaths(value.remove, `features.${id}.remove`),
+    scripts,
+  };
+};
+
 /**
  * Validates parsed `.eep/template.json` content. Unknown keys are rejected so a
  * typo (e.g. `remvoe`) fails loudly instead of silently doing nothing.
@@ -52,58 +139,96 @@ export function isSafeRelativePath(relativePath: string): boolean {
  * @returns The validated manifest, with defaults filled in.
  * @example
  * ```ts
- * parseManifest({ version: 1, readme: 'README.md' }); // { version: 1, remove: [], readme: 'README.md' }
+ * parseManifest({ version: 1, readme: 'README.md' }); // { version: 1, remove: [], readme: 'README.md', features: [] }
  * ```
  */
 export function parseManifest(content: unknown): TemplateManifest {
-  if (
-    typeof content !== 'object' ||
-    content === null ||
-    Array.isArray(content)
-  ) {
+  if (!isObject(content)) {
     throw new ManifestError('Manifest must be a JSON object.');
   }
-  const manifest = content as Record<string, unknown>;
-
-  const unknownKeys = Object.keys(manifest).filter(
-    (key) => !KNOWN_KEYS.has(key),
-  );
-  if (unknownKeys.length > 0) {
+  const { version } = content;
+  if (version !== 1 && version !== 2) {
     throw new ManifestError(
-      `Unknown manifest field(s): ${unknownKeys.join(', ')}. This create-eep supports: ${[...KNOWN_KEYS].join(', ')}.`,
+      `Unsupported manifest version ${JSON.stringify(version)} - this create-eep supports version ${SUPPORTED_VERSIONS.join(' or ')}. Try the latest create-eep.`,
+    );
+  }
+  rejectUnknownKeys(content, KNOWN_KEYS[version], 'manifest');
+
+  const remove = parsePaths(content.remove, 'remove');
+
+  const features = content.features ?? [];
+  if (!Array.isArray(features)) {
+    throw new ManifestError('"features" must be an array.');
+  }
+  const parsedFeatures = features.map(parseFeature);
+  const ids = parsedFeatures.map((feature) => feature.id);
+  const duplicate = ids.find((id, index) => ids.indexOf(id) !== index);
+  if (duplicate !== undefined) {
+    throw new ManifestError(
+      `Feature id "${duplicate}" is used more than once.`,
     );
   }
 
-  if (manifest.version !== SUPPORTED_VERSION) {
-    throw new ManifestError(
-      `Unsupported manifest version ${JSON.stringify(manifest.version)} - this create-eep supports version ${String(SUPPORTED_VERSION)}. Try the latest create-eep.`,
-    );
-  }
-
-  const remove = manifest.remove ?? [];
+  const { readme } = content;
   if (
-    !Array.isArray(remove) ||
-    !remove.every((entry) => typeof entry === 'string')
+    readme !== undefined &&
+    (typeof readme !== 'string' || !isSafeRelativePath(readme))
   ) {
-    throw new ManifestError('"remove" must be an array of paths.');
-  }
-  const unsafe = remove.filter((entry) => !isSafeRelativePath(entry));
-  if (unsafe.length > 0) {
     throw new ManifestError(
-      `"remove" paths must stay inside the project: ${unsafe.join(', ')}`,
+      '"readme" must be a relative path inside the .eep folder.',
     );
   }
 
-  const { readme } = manifest;
-  if (readme !== undefined) {
-    if (typeof readme !== 'string' || !isSafeRelativePath(readme)) {
-      throw new ManifestError(
-        '"readme" must be a relative path inside the .eep folder.',
-      );
-    }
-    return { version: SUPPORTED_VERSION, remove, readme };
+  return {
+    version,
+    remove,
+    ...(readme === undefined ? {} : { readme }),
+    features: parsedFeatures,
+  };
+}
+
+/**
+ * Applies `--with` / `--without` to a template's features. Features named in
+ * neither are left undecided - asked in a terminal, otherwise defaulted.
+ *
+ * @param features - The template's optional features.
+ * @param flags - Feature ids from `--with` and `--without`.
+ * @returns The decided choices and the features still to decide.
+ * @example
+ * ```ts
+ * resolveFeatureFlags(features, { with: ['docs'], without: [] });
+ * // { choices: { docs: true }, undecided: [diagramsFeature, devcontainerFeature] }
+ * ```
+ */
+export function resolveFeatureFlags(
+  features: readonly TemplateFeature[],
+  flags: { with: readonly string[]; without: readonly string[] },
+): { choices: FeatureChoices; undecided: TemplateFeature[] } {
+  const known = features.map((feature) => feature.id);
+  const unknown = [...flags.with, ...flags.without].filter(
+    (id) => !known.includes(id),
+  );
+  if (unknown.length > 0) {
+    throw new ManifestError(
+      known.length === 0
+        ? `This template has no optional extras, so --with/--without "${unknown.join('", "')}" can't apply.`
+        : `Unknown optional extra(s): ${unknown.join(', ')}. This template offers: ${known.join(', ')}.`,
+    );
   }
-  return { version: SUPPORTED_VERSION, remove };
+  const conflicting = flags.with.filter((id) => flags.without.includes(id));
+  if (conflicting.length > 0) {
+    throw new ManifestError(
+      `Both --with and --without given for: ${conflicting.join(', ')}.`,
+    );
+  }
+
+  const choices: FeatureChoices = {};
+  for (const id of flags.with) choices[id] = true;
+  for (const id of flags.without) choices[id] = false;
+  return {
+    choices,
+    undecided: features.filter((feature) => !(feature.id in choices)),
+  };
 }
 
 /**

@@ -20,6 +20,8 @@ import { CANCELLED, createPlainUi } from '../ui.ts';
 type FakeAnswers = {
   projectName?: Answer<string>;
   template?: Answer<string>;
+  /** Answers to optional-extra questions, keyed by the prompt text. */
+  confirms?: Record<string, Answer<boolean>>;
 };
 
 // An interactive Ui that answers prompts from `answers` and records what happened.
@@ -32,6 +34,9 @@ const createFakeUi = (answers: FakeAnswers) => {
       Promise.resolve(answers.projectName ?? CANCELLED),
     ),
     askTemplate: vi.fn(() => Promise.resolve(answers.template ?? CANCELLED)),
+    confirm: vi.fn((message: string, _initialValue: boolean) =>
+      Promise.resolve(answers.confirms?.[message] ?? CANCELLED),
+    ),
     startTask: vi.fn(() => ({ succeed: vi.fn(), fail: vi.fn() })),
     success: vi.fn(),
     error: vi.fn((message: string) => errors.push(message)),
@@ -39,6 +44,32 @@ const createFakeUi = (answers: FakeAnswers) => {
   } satisfies Ui;
   return { ui, errors };
 };
+
+const FEATURES_MANIFEST = JSON.stringify({
+  version: 2,
+  readme: 'README.md',
+  features: [
+    { id: 'docs', prompt: 'Docs?', default: false, remove: ['docs/'] },
+    {
+      id: 'diagrams',
+      prompt: 'Diagrams?',
+      default: true,
+      remove: ['diagrams/'],
+    },
+  ],
+});
+
+// Simulates giget writing a template with a .eep/ manifest, docs/ and diagrams/.
+const fakeTemplateDownload =
+  (manifest: string): CliDependencies['download'] =>
+  (_source, { dir }) => {
+    for (const folder of ['.eep', 'docs', 'diagrams']) {
+      mkdirSync(path.join(dir, folder), { recursive: true });
+    }
+    writeFileSync(path.join(dir, '.eep', 'template.json'), manifest);
+    writeFileSync(path.join(dir, '.eep', 'README.md'), '# {{projectName}}');
+    return Promise.resolve({ dir });
+  };
 
 describe(runCli, () => {
   let cwd: string;
@@ -146,14 +177,8 @@ describe(runCli, () => {
       expect(output.stderr).toContain('404 Not Found');
     });
 
-    // Simulates giget writing a template that has a .eep/ manifest.
     const downloadTemplateWithManifest = (manifest: string) =>
-      download.mockImplementationOnce((_source, { dir }) => {
-        mkdirSync(path.join(dir, '.eep'), { recursive: true });
-        writeFileSync(path.join(dir, '.eep', 'template.json'), manifest);
-        writeFileSync(path.join(dir, '.eep', 'README.md'), '# {{projectName}}');
-        return Promise.resolve({ dir });
-      });
+      download.mockImplementationOnce(fakeTemplateDownload(manifest));
 
     it('applies the template manifest after downloading', async () => {
       downloadTemplateWithManifest(
@@ -172,8 +197,40 @@ describe(runCli, () => {
       downloadTemplateWithManifest(JSON.stringify({ version: 99 }));
 
       expect(await run(['my-app'])).toBe(1);
-      expect(output.stderr).toContain('.eep/template.json is invalid');
+      expect(output.stderr).toContain('Unsupported manifest version 99');
+      expect(output.stderr).toContain('Nothing was created');
       expect(existsSync(path.join(cwd, 'my-app'))).toBe(false);
+    });
+
+    it('uses each optional extra default without prompting', async () => {
+      downloadTemplateWithManifest(FEATURES_MANIFEST);
+
+      expect(await run(['my-app'])).toBe(0);
+      expect(existsSync(path.join(cwd, 'my-app', 'docs'))).toBe(false);
+      expect(existsSync(path.join(cwd, 'my-app', 'diagrams'))).toBe(true);
+    });
+
+    it('applies --with and --without over the defaults', async () => {
+      downloadTemplateWithManifest(FEATURES_MANIFEST);
+
+      expect(
+        await run(['my-app', '--with', 'docs', '--without', 'diagrams']),
+      ).toBe(0);
+      expect(existsSync(path.join(cwd, 'my-app', 'docs'))).toBe(true);
+      expect(existsSync(path.join(cwd, 'my-app', 'diagrams'))).toBe(false);
+    });
+
+    it('fails on an unknown extra and removes the half-made project', async () => {
+      downloadTemplateWithManifest(FEATURES_MANIFEST);
+
+      expect(await run(['my-app', '--with', 'docz'])).toBe(1);
+      expect(output.stderr).toContain('This template offers: docs, diagrams');
+      expect(existsSync(path.join(cwd, 'my-app'))).toBe(false);
+    });
+
+    it('fails on --with for a template without a manifest', async () => {
+      expect(await run(['my-app', '--with', 'docs'])).toBe(1);
+      expect(output.stderr).toContain('has no optional extras');
     });
   });
 
@@ -265,6 +322,40 @@ describe(runCli, () => {
       expect(validate?.('my-app')).toBeUndefined();
       expect(validate?.('My App')).toMatch(/can only contain/);
       expect(validate?.('taken')).toMatch(/already exists/);
+    });
+
+    it('asks about each optional extra and applies the answers', async () => {
+      download.mockImplementationOnce(fakeTemplateDownload(FEATURES_MANIFEST));
+      const { ui } = createFakeUi({
+        template: 'next-app',
+        confirms: { 'Docs?': true, 'Diagrams?': false },
+      });
+
+      expect(await run(['my-app'], ui)).toBe(0);
+      expect(ui.confirm).toHaveBeenCalledWith('Docs?', false);
+      expect(ui.confirm).toHaveBeenCalledWith('Diagrams?', true);
+      expect(existsSync(path.join(cwd, 'my-app', 'docs'))).toBe(true);
+      expect(existsSync(path.join(cwd, 'my-app', 'diagrams'))).toBe(false);
+    });
+
+    it('only asks about extras not given as flags', async () => {
+      download.mockImplementationOnce(fakeTemplateDownload(FEATURES_MANIFEST));
+      const { ui } = createFakeUi({
+        template: 'next-app',
+        confirms: { 'Diagrams?': true },
+      });
+
+      expect(await run(['my-app', '--without', 'docs'], ui)).toBe(0);
+      expect(ui.confirm).toHaveBeenCalledExactlyOnceWith('Diagrams?', true);
+    });
+
+    it('removes the downloaded project when an extra question is cancelled', async () => {
+      download.mockImplementationOnce(fakeTemplateDownload(FEATURES_MANIFEST));
+      const { ui } = createFakeUi({ template: 'next-app' });
+
+      expect(await run(['my-app'], ui)).toBe(130);
+      expect(ui.cancelled).toHaveBeenCalledOnce();
+      expect(existsSync(path.join(cwd, 'my-app'))).toBe(false);
     });
 
     it('reports a failed download through the task and error output', async () => {

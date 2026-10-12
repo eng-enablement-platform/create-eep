@@ -2,6 +2,10 @@ import { existsSync } from 'node:fs';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import type {
+  FeatureChoices,
+  TemplateManifest,
+} from '../templates/manifest.ts';
 import {
   MANIFEST_DIRECTORY,
   MANIFEST_FILE,
@@ -10,36 +14,23 @@ import {
   renderPlaceholders,
 } from '../templates/manifest.ts';
 
-type ApplyManifestOptions = {
-  projectDir: string;
-  projectName: string;
-  templateName: string;
-};
-
 /**
- * Turns a freshly downloaded template into a project, following its
- * `.eep/template.json`: removes template-maintenance paths, swaps in the
- * starter README, sets the package.json name, then deletes `.eep/`.
- * Templates without a manifest (e.g. any GitHub repo) are left as-is.
+ * Reads and validates a downloaded template's `.eep/template.json`.
  *
- * @param options - The downloaded project directory, project and template names.
- * @returns `true` when a manifest was found and applied.
+ * @param projectDir - The downloaded project directory.
+ * @returns The manifest, or `undefined` when the template has none (it is then used as-is).
  * @example
  * ```ts
- * await applyManifest({ projectDir, projectName: 'my-app', templateName: 'web-dev-starter' });
+ * const manifest = await loadManifest(projectDir);
  * ```
  */
-export async function applyManifest({
-  projectDir,
-  projectName,
-  templateName,
-}: ApplyManifestOptions): Promise<boolean> {
-  const manifestDir = path.join(projectDir, MANIFEST_DIRECTORY);
-  const manifestPath = path.join(manifestDir, MANIFEST_FILE);
+export async function loadManifest(
+  projectDir: string,
+): Promise<TemplateManifest | undefined> {
+  const manifestPath = path.join(projectDir, MANIFEST_DIRECTORY, MANIFEST_FILE);
   if (!existsSync(manifestPath)) {
-    return false;
+    return undefined;
   }
-
   let content: unknown;
   try {
     content = JSON.parse(await readFile(manifestPath, 'utf8'));
@@ -49,15 +40,53 @@ export async function applyManifest({
       `Could not read ${MANIFEST_DIRECTORY}/${MANIFEST_FILE}: ${reason}`,
     );
   }
-  const manifest = parseManifest(content);
+  return parseManifest(content);
+}
 
-  for (const relativePath of manifest.remove) {
+type ApplyManifestOptions = {
+  projectDir: string;
+  manifest: TemplateManifest;
+  /** Whether each optional feature is kept - every feature id must be decided. */
+  choices: FeatureChoices;
+  projectName: string;
+  templateName: string;
+};
+
+/**
+ * Turns a freshly downloaded template into a project: removes
+ * template-maintenance paths and dropped features (their paths and
+ * package.json scripts), swaps in the starter README, sets the package.json
+ * name, then deletes `.eep/`.
+ *
+ * @param options - Project directory, manifest, feature choices, project and template names.
+ * @example
+ * ```ts
+ * await applyManifest({ projectDir, manifest, choices: { docs: false }, projectName: 'my-app', templateName: 'next-app' });
+ * ```
+ */
+export async function applyManifest({
+  projectDir,
+  manifest,
+  choices,
+  projectName,
+  templateName,
+}: ApplyManifestOptions): Promise<void> {
+  const dropped = manifest.features.filter(
+    (feature) => choices[feature.id] !== true,
+  );
+
+  const pathsToRemove = [
+    ...manifest.remove,
+    ...dropped.flatMap((feature) => feature.remove),
+  ];
+  for (const relativePath of pathsToRemove) {
     await rm(path.join(projectDir, relativePath), {
       recursive: true,
       force: true,
     });
   }
 
+  const manifestDir = path.join(projectDir, MANIFEST_DIRECTORY);
   if (manifest.readme !== undefined) {
     const starter = await readFile(
       path.join(manifestDir, manifest.readme),
@@ -69,15 +98,22 @@ export async function applyManifest({
     );
   }
 
-  await setPackageName(projectDir, projectName);
+  await updatePackageJson(
+    projectDir,
+    projectName,
+    dropped.flatMap((feature) => feature.scripts),
+  );
   await rm(manifestDir, { recursive: true, force: true });
-  return true;
 }
 
-// Rename the template's package.json `name`, keeping every other field and its order.
-const setPackageName = async (
+/*
+ * Sets the package.json name and removes scripts belonging to dropped
+ * features, keeping every other field and its order.
+ */
+const updatePackageJson = async (
   projectDir: string,
   projectName: string,
+  scriptsToRemove: readonly string[],
 ): Promise<void> => {
   const packageJsonPath = path.join(projectDir, 'package.json');
   if (!existsSync(packageJsonPath)) {
@@ -87,5 +123,15 @@ const setPackageName = async (
     await readFile(packageJsonPath, 'utf8'),
   ) as Record<string, unknown>;
   packageJson.name = projectName;
+
+  const { scripts } = packageJson;
+  if (typeof scripts === 'object' && scripts !== null) {
+    const remaining = Object.fromEntries(
+      Object.entries(scripts).filter(
+        ([name]) => !scriptsToRemove.includes(name),
+      ),
+    );
+    packageJson.scripts = remaining;
+  }
   await writeFile(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
 };

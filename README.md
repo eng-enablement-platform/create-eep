@@ -6,7 +6,7 @@
 
 Scaffold new projects from Engineering Enablement Platform (EEP) templates.
 
-> **Early days.** Optional template features (e.g. the Next.js docs site) and dependency install are coming.
+> **Early days.** Dependency install is coming next.
 
 ## Usage
 
@@ -51,6 +51,8 @@ npm create eep@latest my-app -- --template https://github.com/org/repo
 | Option                         | Description                                                                 |
 | ------------------------------ | --------------------------------------------------------------------------- |
 | `-t, --template <name-or-url>` | Template name, GitHub repo URL or `gh:org/repo` (default `web-dev-starter`) |
+| `--with <extra>`               | Keep an optional extra the template offers, e.g. `docs` (repeatable)        |
+| `--without <extra>`            | Drop an optional extra the template offers (repeatable)                     |
 | `-y, --yes`                    | Skip prompts and use the defaults                                           |
 | `-v, --version`                | Print the version                                                           |
 | `-h, --help`                   | Show help, including the template list                                      |
@@ -65,15 +67,26 @@ Templates without one (including any GitHub repo) are copied as-is.
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "remove": ["path/only-needed-to-maintain-the-template/"],
-  "readme": "README.md"
+  "readme": "README.md",
+  "features": [
+    {
+      "id": "docs",
+      "prompt": "Include the docs site?",
+      "default": false,
+      "remove": ["docs/"],
+      "scripts": ["dev:docs", "build:docs"]
+    }
+  ]
 }
 ```
 
 - `remove` - paths always deleted from generated projects (must stay inside the project)
 - `readme` - a starter README inside `.eep/` that replaces the template's own. `{{projectName}}` and `{{templateName}}` are filled in
+- `features` (version 2) - optional extras. In a terminal each `prompt` is asked as a yes/no question with `default` pre-selected; otherwise `--with <id>` / `--without <id>` decide, falling back to `default`. A dropped feature has its `remove` paths deleted and its `scripts` removed from `package.json`
 - `package.json` `name` (if present) is set to the project name
+- Version 1 manifests (no `features`) are still supported
 
 If setup fails, the half-made project directory is removed.
 

@@ -1,13 +1,17 @@
 import { Command, CommanderError } from 'commander';
 
 import packageJson from '../../package.json' with { type: 'json' };
+import { applyManifest, loadManifest } from '../scaffold/apply-manifest.ts';
 import type { Downloader } from '../scaffold/create-project.ts';
 import {
   checkDestination,
-  createProject,
   CreateProjectError,
+  downloadProject,
+  removeProject,
 } from '../scaffold/create-project.ts';
 import { validateProjectName } from '../scaffold/project-name.ts';
+import type { FeatureChoices } from '../templates/manifest.ts';
+import { ManifestError, resolveFeatureFlags } from '../templates/manifest.ts';
 import {
   DEFAULT_TEMPLATE_NAME,
   resolveTemplateSource,
@@ -26,7 +30,22 @@ export type CliDependencies = {
   stderr: (text: string) => void;
 };
 
-type CliOptions = { template: string; yes?: boolean };
+type CliOptions = {
+  template: string;
+  yes?: boolean;
+  // Undefined when not given - no default, so --help doesn't show "(default: [])".
+  with?: string[];
+  without?: string[];
+};
+
+/*
+ * Commander collector for repeatable options (`--with docs --with diagrams`).
+ * `previous` is undefined on first use, since the options have no default.
+ */
+const collect = (value: string, previous: string[] = []): string[] => [
+  ...previous,
+  value,
+];
 
 // Exit code for a user cancel (Ctrl+C) - the shell convention for SIGINT.
 const CANCELLED_EXIT_CODE = 130;
@@ -70,6 +89,16 @@ export async function runCli(
       DEFAULT_TEMPLATE_NAME,
     )
     .option('-y, --yes', 'skip prompts and use the defaults')
+    .option(
+      '--with <extra>',
+      'keep an optional extra the template offers, e.g. docs (repeatable)',
+      collect,
+    )
+    .option(
+      '--without <extra>',
+      'drop an optional extra the template offers (repeatable)',
+      collect,
+    )
     .addHelpText(
       'after',
       `\nTemplates:\n${templateList}\n\nRun without arguments in a terminal to be asked instead.\n\nExample:\n  npx create-eep@latest my-app --template next-app`,
@@ -145,27 +174,87 @@ export async function runCli(
     return 1;
   }
 
-  // ── Scaffold ─────────────────────────────────────────────────────────────
-  const task = ui.startTask(
-    `Downloading and setting up the "${template}" template`,
-  );
+  // ── Download ─────────────────────────────────────────────────────────────
+  const downloadTask = ui.startTask(`Downloading the "${template}" template`);
+  let projectDir: string;
   try {
-    const dir = await createProject({
+    projectDir = await downloadProject({
       projectName,
-      templateName: template,
       templateSource,
       cwd,
       download,
     });
-    task.succeed(`Created ${projectName} at ${dir}`);
-    ui.success('Done! Happy building.', [`cd ${projectName}`]);
-    return 0;
+    downloadTask.succeed(`Downloaded the "${template}" template`);
   } catch (error) {
     if (error instanceof CreateProjectError) {
-      task.fail('Setup failed');
+      downloadTask.fail('Download failed');
       ui.error(error.message);
       return 1;
     }
     throw error;
   }
+
+  /*
+   * From here the directory exists - remove it on any failure or cancel so
+   * nothing half-made is left behind.
+   */
+  try {
+    // ── Optional extras ──────────────────────────────────────────────────────
+    const manifest = await loadManifest(projectDir);
+    const { choices, undecided } = resolveFeatureFlags(
+      manifest?.features ?? [],
+      { with: options.with ?? [], without: options.without ?? [] },
+    );
+    const decided: FeatureChoices = { ...choices };
+    for (const feature of undecided) {
+      if (!canPrompt) {
+        decided[feature.id] = feature.default;
+        continue;
+      }
+      const answer = await ui.confirm(feature.prompt, feature.default);
+      if (answer === CANCELLED) {
+        await removeProject(projectDir);
+        ui.cancelled();
+        return CANCELLED_EXIT_CODE;
+      }
+      decided[feature.id] = answer;
+    }
+
+    // ── Set up ───────────────────────────────────────────────────────────────
+    if (manifest !== undefined) {
+      const setupTask = ui.startTask('Setting up your project');
+      await applyManifest({
+        projectDir,
+        manifest,
+        choices: decided,
+        projectName,
+        templateName: template,
+      });
+      setupTask.succeed(describeChoices(decided));
+    }
+  } catch (error) {
+    await removeProject(projectDir);
+    if (error instanceof ManifestError) {
+      ui.error(`${error.message} Nothing was created.`);
+      return 1;
+    }
+    throw error;
+  }
+
+  ui.success(`Created ${projectName} at ${projectDir}`, [`cd ${projectName}`]);
+  return 0;
 }
+
+// One line summarising the optional extras, e.g. "Set up with diagrams - without docs".
+const describeChoices = (choices: FeatureChoices): string => {
+  const kept = Object.keys(choices).filter((id) => choices[id]);
+  const dropped = Object.keys(choices).filter((id) => !choices[id]);
+  if (kept.length === 0 && dropped.length === 0) {
+    return 'Project set up';
+  }
+  const parts = [
+    kept.length > 0 ? `with ${kept.join(', ')}` : '',
+    dropped.length > 0 ? `without ${dropped.join(', ')}` : '',
+  ].filter(Boolean);
+  return `Set up ${parts.join(' - ')}`;
+};
