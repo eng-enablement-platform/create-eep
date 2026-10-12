@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.3.0...v0.4.0) (2026-10-12)
+
+
+### Features
+
+* optional template extras with prompts and --with/--without flags ([9baeede](https://github.com/eng-enablement-platform/create-eep/commit/9baeede7cd89d6b19c329cc6cb110c9882fba498))
+
 ## [0.3.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.2.0...v0.3.0) (2026-10-11)
 
 
