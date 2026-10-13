@@ -4,15 +4,41 @@ import path from 'node:path';
 export const MANIFEST_DIRECTORY = '.eep';
 export const MANIFEST_FILE = 'template.json';
 
-const SUPPORTED_VERSIONS = [1, 2] as const;
-const KNOWN_KEYS: Record<1 | 2, readonly string[]> = {
+const SUPPORTED_VERSIONS = [1, 2, 3] as const;
+type ManifestVersion = (typeof SUPPORTED_VERSIONS)[number];
+const KNOWN_KEYS: Record<ManifestVersion, readonly string[]> = {
   1: ['version', 'remove', 'readme'],
   2: ['version', 'remove', 'readme', 'features'],
+  3: ['version', 'remove', 'readme', 'features'],
 };
-const FEATURE_KEYS = ['id', 'prompt', 'default', 'remove', 'scripts'];
+// Feature fields by manifest version - `setup` arrived in version 3.
+const FEATURE_KEYS: Record<ManifestVersion, readonly string[]> = {
+  1: [],
+  2: ['id', 'prompt', 'default', 'remove', 'scripts'],
+  3: ['id', 'prompt', 'default', 'remove', 'scripts', 'setup'],
+};
+const SETUP_KEYS = ['title', 'command', 'cwd', 'requires', 'missing'];
 const FEATURE_ID_PATTERN = /^[a-z][a-z0-9-]*$/;
 
-/** An optional part of a template the user can keep or drop (manifest version 2). */
+/**
+ * A command run to finish setting up a kept feature (manifest version 3), e.g.
+ * `uv sync` for diagrams. Runs only when the user accepts installing
+ * dependencies, and only if `requires` is installed.
+ */
+export type SetupStep = {
+  /** Shown while it runs, e.g. "Install diagram dependencies". */
+  title: string;
+  /** Executable and arguments - run without a shell, e.g. `["uv", "sync"]`. */
+  command: string[];
+  /** Directory to run in, relative to the project. Defaults to the project root. */
+  cwd: string;
+  /** Tool that must be installed - defaults to the command itself. */
+  requires: string;
+  /** Shown instead of running when `requires` isn't installed. */
+  missing: string;
+};
+
+/** An optional part of a template the user can keep or drop (manifest version 2+). */
 export type TemplateFeature = {
   /** Used with `--with <id>` / `--without <id>`. */
   id: string;
@@ -24,11 +50,13 @@ export type TemplateFeature = {
   remove: string[];
   /** package.json scripts removed when the feature is dropped. */
   scripts: string[];
+  /** Set-up step run when the feature is kept (manifest version 3). */
+  setup?: SetupStep;
 };
 
 /** A template's `.eep/template.json`: what create-eep does after downloading it. */
 export type TemplateManifest = {
-  version: 1 | 2;
+  version: ManifestVersion;
   /** Template-maintenance paths always removed from generated projects. */
   remove: string[];
   /** Starter README inside `.eep/` that replaces the template's own README. */
@@ -98,12 +126,47 @@ const rejectUnknownKeys = (
   }
 };
 
-const parseFeature = (value: unknown, index: number): TemplateFeature => {
+const parseSetup = (value: unknown, featureId: string): SetupStep => {
+  const where = `features.${featureId}.setup`;
+  if (!isObject(value)) {
+    throw new ManifestError(`${where} must be an object.`);
+  }
+  rejectUnknownKeys(value, SETUP_KEYS, where);
+  const { title, command, missing } = value;
+  if (typeof title !== 'string' || title.trim() === '') {
+    throw new ManifestError(`${where} needs a "title".`);
+  }
+  if (!isStringArray(command) || command.length === 0 || command[0] === '') {
+    throw new ManifestError(
+      `${where}.command must be a non-empty array, e.g. ["uv", "sync"].`,
+    );
+  }
+  if (typeof missing !== 'string' || missing.trim() === '') {
+    throw new ManifestError(
+      `${where} needs a "missing" message, shown when the tool isn't installed.`,
+    );
+  }
+  const cwd = value.cwd ?? '.';
+  if (typeof cwd !== 'string' || (cwd !== '.' && !isSafeRelativePath(cwd))) {
+    throw new ManifestError(`${where}.cwd must stay inside the project.`);
+  }
+  const requires = value.requires ?? command[0];
+  if (typeof requires !== 'string' || requires === '') {
+    throw new ManifestError(`${where}.requires must be a command name.`);
+  }
+  return { title, command, cwd, requires, missing };
+};
+
+const parseFeature = (
+  value: unknown,
+  index: number,
+  version: ManifestVersion,
+): TemplateFeature => {
   const where = `features[${String(index)}]`;
   if (!isObject(value)) {
     throw new ManifestError(`${where} must be an object.`);
   }
-  rejectUnknownKeys(value, FEATURE_KEYS, where);
+  rejectUnknownKeys(value, FEATURE_KEYS[version], where);
   const { id, prompt } = value;
   if (typeof id !== 'string' || !FEATURE_ID_PATTERN.test(id)) {
     throw new ManifestError(
@@ -128,6 +191,9 @@ const parseFeature = (value: unknown, index: number): TemplateFeature => {
     default: value.default,
     remove: parsePaths(value.remove, `features.${id}.remove`),
     scripts,
+    ...(value.setup === undefined
+      ? {}
+      : { setup: parseSetup(value.setup, id) }),
   };
 };
 
@@ -147,9 +213,9 @@ export function parseManifest(content: unknown): TemplateManifest {
     throw new ManifestError('Manifest must be a JSON object.');
   }
   const { version } = content;
-  if (version !== 1 && version !== 2) {
+  if (version !== 1 && version !== 2 && version !== 3) {
     throw new ManifestError(
-      `Unsupported manifest version ${JSON.stringify(version)} - this create-eep supports version ${SUPPORTED_VERSIONS.join(' or ')}. Try the latest create-eep.`,
+      `Unsupported manifest version ${JSON.stringify(version)} - this create-eep supports versions ${SUPPORTED_VERSIONS.join(', ')}. Try the latest create-eep.`,
     );
   }
   rejectUnknownKeys(content, KNOWN_KEYS[version], 'manifest');
@@ -160,7 +226,9 @@ export function parseManifest(content: unknown): TemplateManifest {
   if (!Array.isArray(features)) {
     throw new ManifestError('"features" must be an array.');
   }
-  const parsedFeatures = features.map(parseFeature);
+  const parsedFeatures = features.map((feature, index) =>
+    parseFeature(feature, index, version),
+  );
   const ids = parsedFeatures.map((feature) => feature.id);
   const duplicate = ids.find((id, index) => ids.indexOf(id) !== index);
   if (duplicate !== undefined) {

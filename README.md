@@ -6,7 +6,7 @@
 
 Scaffold new projects from Engineering Enablement Platform (EEP) templates.
 
-> **Early days.** Template set-up steps (e.g. diagram dependencies) are coming next.
+> **Early days.** Feedback welcome - see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Usage
 
@@ -70,7 +70,7 @@ Templates without one are copied as-is.
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "remove": ["path/only-needed-to-maintain-the-template/"],
   "readme": "README.md",
   "features": [
@@ -80,6 +80,18 @@ Templates without one are copied as-is.
       "default": false,
       "remove": ["docs/"],
       "scripts": ["dev:docs", "build:docs"]
+    },
+    {
+      "id": "diagrams",
+      "prompt": "Include diagrams-as-code?",
+      "default": true,
+      "remove": ["diagrams/"],
+      "setup": {
+        "title": "Install diagram dependencies",
+        "command": ["uv", "sync"],
+        "cwd": "diagrams",
+        "missing": "Diagrams need uv (it downloads Python for you) - see https://docs.astral.sh/uv/getting-started/installation/, then `cd diagrams && uv sync`."
+      }
     }
   ]
 }
@@ -87,9 +99,10 @@ Templates without one are copied as-is.
 
 - `remove` - paths always deleted from generated projects (must stay inside the project)
 - `readme` - a starter README inside `.eep/` that replaces the template's own. `{{projectName}}` and `{{templateName}}` are filled in
-- `features` (version 2) - optional extras. In a terminal each `prompt` is asked as a yes/no question with `default` pre-selected; otherwise `--with <id>` / `--without <id>` decide, falling back to `default`. A dropped feature has its `remove` paths deleted and its `scripts` removed from `package.json`
+- `features` (version 2+) - optional extras. In a terminal each `prompt` is asked as a yes/no question with `default` pre-selected; otherwise `--with <id>` / `--without <id>` decide, falling back to `default`. A dropped feature has its `remove` paths deleted and its `scripts` removed from `package.json`
+- `setup` (version 3) - a command run for a kept feature, together with the dependency install (same question, same `--install` / `--no-install`). Runs without a shell in `cwd`. If `requires` (default: the command itself) isn't installed, `missing` is shown instead; if the install is skipped, the command is listed under next steps
 - `package.json` `name` (if present) is set to the project name
-- Version 1 manifests (no `features`) are still supported
+- Version 1 and 2 manifests are still supported
 
 If setup fails, the half-made project directory is removed.
 

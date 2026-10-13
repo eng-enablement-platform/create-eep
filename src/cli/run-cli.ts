@@ -11,7 +11,7 @@ import {
   removeProject,
 } from '../scaffold/create-project.ts';
 import { validateProjectName } from '../scaffold/project-name.ts';
-import type { FeatureChoices } from '../templates/manifest.ts';
+import type { FeatureChoices, SetupStep } from '../templates/manifest.ts';
 import { ManifestError, resolveFeatureFlags } from '../templates/manifest.ts';
 import {
   DEFAULT_TEMPLATE_NAME,
@@ -230,6 +230,7 @@ export async function runCli(
   const finishFlags = { git: options.git, install: options.install };
   let facts: Awaited<ReturnType<typeof inspectProject>>;
   let finishChoices: FinishChoices;
+  let setupSteps: SetupStep[];
   try {
     // ── Optional extras ──────────────────────────────────────────────────────
     const manifest = await loadManifest(projectDir);
@@ -254,11 +255,17 @@ export async function runCli(
 
     // ── Git + install questions - asked now, before anything slow runs ───────
     facts = await inspectProject(projectDir, run, userAgent);
+    setupSteps = (manifest?.features ?? []).flatMap((feature) =>
+      decided[feature.id] === true && feature.setup !== undefined
+        ? [feature.setup]
+        : [],
+    );
     const finishAnswer = await askFinishChoices(
       facts,
       finishFlags,
       ui,
       canPrompt,
+      setupSteps,
     );
     if (finishAnswer === CANCELLED) {
       await removeProject(projectDir);
@@ -297,7 +304,7 @@ export async function runCli(
     facts,
     finishChoices,
     finishFlags,
-    { projectDir, projectName, ui, run },
+    { projectDir, projectName, ui, run, setupSteps },
   );
 
   ui.success(`Created ${projectName} at ${projectDir}`, nextSteps, notes);

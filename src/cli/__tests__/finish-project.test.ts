@@ -5,6 +5,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CommandResult, RunCommand } from '../../scaffold/commands.ts';
+import type { SetupStep } from '../../templates/manifest.ts';
 import {
   askFinishChoices,
   finishProject,
@@ -35,6 +36,15 @@ const NOT_A_REPO: Answers = {
   },
 };
 const MISSING = { exitCode: 127, output: 'ENOENT' };
+
+const UV_SYNC: SetupStep = {
+  title: 'Install diagram dependencies',
+  command: ['uv', 'sync'],
+  cwd: 'diagrams',
+  requires: 'uv',
+  missing:
+    'Diagrams need uv (it downloads Python for you) - see https://docs.astral.sh/uv/getting-started/installation/, then `cd diagrams && uv sync`.',
+};
 
 describe('finishing a project', () => {
   let projectDir: string;
@@ -189,6 +199,31 @@ describe('finishing a project', () => {
       ).toStrictEqual({ git: false, install: false });
     });
 
+    it('names every tool in the install question when set-up steps run too', async () => {
+      const ui = askingUi({});
+
+      await askFinishChoices(facts, noFlags, ui, true, [UV_SYNC]);
+
+      expect(ui.confirm).toHaveBeenCalledWith(
+        'Install dependencies (pnpm, uv)?',
+        true,
+      );
+    });
+
+    it('offers the install for set-up steps alone (no package.json)', async () => {
+      const ui = askingUi({});
+
+      expect(
+        await askFinishChoices({ canInitGit: false }, noFlags, ui, true, [
+          UV_SYNC,
+        ]),
+      ).toStrictEqual({ git: false, install: true });
+      expect(ui.confirm).toHaveBeenCalledWith(
+        'Install dependencies with uv?',
+        true,
+      );
+    });
+
     it('returns CANCELLED when a question is cancelled', async () => {
       const ui = askingUi({ 'Initialise a git repository?': CANCELLED });
 
@@ -211,12 +246,14 @@ describe('finishing a project', () => {
       choices: { git: boolean; install: boolean },
       run: RunCommand,
       flags: Parameters<typeof finishProject>[2] = noFlags,
+      setupSteps: SetupStep[] = [],
     ) =>
       finishProject(facts, choices, flags, {
         projectDir,
         projectName: 'my-app',
         ui: quietUi,
         run,
+        setupSteps,
       });
 
     it('runs git init, then the install, then the first commit', async () => {
@@ -247,6 +284,7 @@ describe('finishing a project', () => {
         run: fakeRunner({
           'pnpm install': { exitCode: 0, output: 'Packages: +42\nDone in 3s' },
         }),
+        setupSteps: [],
       });
 
       expect(log).toHaveBeenCalledWith('Packages: +42');
@@ -300,6 +338,84 @@ describe('finishing a project', () => {
         expect.anything(),
       );
       expect(result.notes[0]).toMatch(/uses pnpm, which isn't installed/);
+    });
+
+    it('runs set-up steps after the install and before the commit, in their cwd', async () => {
+      const run = fakeRunner();
+
+      const result = await finish(
+        pnpmFacts,
+        { git: true, install: true },
+        run,
+        noFlags,
+        [UV_SYNC],
+      );
+
+      expect(
+        run.mock.calls
+          .filter(([, args]) => args[0] !== '--version')
+          .map(([command, args]) => `${command} ${args[0] ?? ''}`),
+      ).toStrictEqual([
+        'git init',
+        'pnpm install',
+        'uv sync',
+        'git add',
+        'git commit',
+      ]);
+      const uvCall = run.mock.calls.find(
+        ([command, args]) => command === 'uv' && args[0] === 'sync',
+      );
+      expect(uvCall?.[2].cwd).toBe(path.join(projectDir, 'diagrams'));
+      expect(result.notes).toStrictEqual([]);
+    });
+
+    it('shows the missing-tool callout instead of running the step', async () => {
+      const run = fakeRunner({ 'uv --version': MISSING });
+
+      const result = await finish(
+        pnpmFacts,
+        { git: false, install: true },
+        run,
+        noFlags,
+        [UV_SYNC],
+      );
+
+      expect(run).not.toHaveBeenCalledWith('uv', ['sync'], expect.anything());
+      expect(result.notes).toStrictEqual([UV_SYNC.missing]);
+    });
+
+    it('turns a failed set-up step into a note', async () => {
+      const result = await finish(
+        pnpmFacts,
+        { git: false, install: true },
+        fakeRunner({ 'uv sync': { exitCode: 2, output: 'error: no network' } }),
+        noFlags,
+        [UV_SYNC],
+      );
+
+      expect(result.notes[0]).toMatch(
+        /Install diagram dependencies failed - run `uv sync` in my-app\/diagrams/,
+      );
+    });
+
+    it('lists skipped set-up steps as next steps when the install is declined', async () => {
+      const run = fakeRunner();
+
+      const result = await finish(
+        pnpmFacts,
+        { git: false, install: false },
+        run,
+        noFlags,
+        [UV_SYNC],
+      );
+
+      expect(run).not.toHaveBeenCalledWith('uv', ['sync'], expect.anything());
+      expect(result.nextSteps).toStrictEqual([
+        'cd my-app',
+        'pnpm install',
+        'pnpm dev',
+        '(cd diagrams && uv sync)',
+      ]);
     });
 
     it('explains a missing git identity', async () => {

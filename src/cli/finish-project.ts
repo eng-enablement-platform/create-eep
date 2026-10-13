@@ -14,6 +14,7 @@ import {
   choosePackageManager,
   runScriptCommand,
 } from '../scaffold/package-manager.ts';
+import type { SetupStep } from '../templates/manifest.ts';
 import type { Answer, Ui } from './ui.ts';
 import { CANCELLED } from './ui.ts';
 
@@ -38,6 +39,27 @@ type FinishContext = {
   projectName: string;
   ui: Ui;
   run: RunCommand;
+  /** Set-up steps of the kept optional extras (manifest version 3), e.g. `uv sync`. */
+  setupSteps: readonly SetupStep[];
+};
+
+/*
+ * The install question names every tool that will run, so accepting it never
+ * hides a step - e.g. "Install dependencies (pnpm, uv)?".
+ */
+const installQuestion = (
+  facts: ProjectFacts,
+  setupSteps: readonly SetupStep[],
+): string => {
+  const tools = [
+    ...(facts.packages?.packageManagerInstalled === true
+      ? [facts.packages.packageManager]
+      : []),
+    ...setupSteps.map((step) => step.requires),
+  ].filter((tool, index, all) => all.indexOf(tool) === index);
+  return tools.length === 1
+    ? `Install dependencies with ${tools[0] ?? ''}?`
+    : `Install dependencies (${tools.join(', ')})?`;
 };
 
 /**
@@ -103,6 +125,7 @@ export async function inspectProject(
  * @param flags - `--git` / `--no-git` and `--install` / `--no-install` (undefined when not given).
  * @param ui - Asks the questions.
  * @param canPrompt - Whether questions can be asked (a terminal, no `--yes`).
+ * @param setupSteps - Set-up steps of the kept optional extras - they run with the install.
  * @returns The choices, or {@link CANCELLED}.
  * @example
  * ```ts
@@ -114,6 +137,7 @@ export async function askFinishChoices(
   flags: { git: boolean | undefined; install: boolean | undefined },
   ui: Ui,
   canPrompt: boolean,
+  setupSteps: readonly SetupStep[] = [],
 ): Promise<Answer<FinishChoices>> {
   const decide = async (
     available: boolean,
@@ -133,9 +157,9 @@ export async function askFinishChoices(
   if (git === CANCELLED) return CANCELLED;
 
   const install = await decide(
-    facts.packages?.packageManagerInstalled === true,
+    facts.packages?.packageManagerInstalled === true || setupSteps.length > 0,
     flags.install,
-    `Install dependencies with ${facts.packages?.packageManager ?? 'npm'}?`,
+    installQuestion(facts, setupSteps),
   );
   if (install === CANCELLED) return CANCELLED;
 
@@ -165,7 +189,7 @@ export async function finishProject(
   facts: ProjectFacts,
   choices: FinishChoices,
   flags: { git: boolean | undefined; install: boolean | undefined },
-  { projectDir, projectName, ui, run }: FinishContext,
+  { projectDir, projectName, ui, run, setupSteps }: FinishContext,
 ): Promise<{ nextSteps: string[]; notes: string[] }> {
   const notes: string[] = [];
   if (facts.gitBlocker !== undefined && flags.git !== false) {
@@ -208,6 +232,31 @@ export async function finishProject(
     }
   }
 
+  // Set-up steps run with the install (same consent), before the commit so it includes their output.
+  const skippedSteps: SetupStep[] = [];
+  for (const step of setupSteps) {
+    if (!choices.install) {
+      skippedSteps.push(step);
+    } else if (!(await commandExists(step.requires, run))) {
+      notes.push(step.missing);
+    } else {
+      const [command = '', ...args] = step.command;
+      const task = ui.startLogTask(step.title);
+      const { exitCode } = await run(command, args, {
+        cwd: path.join(projectDir, step.cwd),
+        onLine: task.log,
+      });
+      if (exitCode === 0) {
+        task.succeed(step.title);
+      } else {
+        task.fail(`${step.title} failed`);
+        notes.push(
+          `${step.title} failed - run \`${step.command.join(' ')}\` in ${path.join(projectName, step.cwd)} to see why.`,
+        );
+      }
+    }
+  }
+
   if (gitInitialised) {
     const commit = await commitAll(projectDir, run);
     if (!commit.committed) {
@@ -225,6 +274,13 @@ export async function finishProject(
     if (packages.hasDevScript) {
       nextSteps.push(runScriptCommand(packages.packageManager, 'dev'));
     }
+  }
+  // Steps the user chose not to run now, written so they work from the project root.
+  for (const step of skippedSteps) {
+    const command = step.command.join(' ');
+    nextSteps.push(
+      step.cwd === '.' ? command : `(cd ${step.cwd} && ${command})`,
+    );
   }
   return { nextSteps, notes };
 }

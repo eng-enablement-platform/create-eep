@@ -33,7 +33,7 @@ describe(parseManifest, () => {
     ['a non-object', 'nope', /JSON object/],
     ['an array', [], /JSON object/],
     ['a missing version', {}, /Unsupported manifest version/],
-    ['a newer version', { version: 3 }, /Unsupported manifest version 3/],
+    ['a newer version', { version: 4 }, /Unsupported manifest version 4/],
     [
       'features in a version 1 manifest',
       { version: 1, features: [] },
@@ -123,6 +123,67 @@ describe('parseManifest - version 2 features', () => {
     ],
   ])('rejects %s', (_case, fields, message) => {
     expect(() => parseManifest({ version: 2, ...fields })).toThrow(message);
+  });
+});
+
+describe('parseManifest - version 3 set-up steps', () => {
+  const diagrams = {
+    id: 'diagrams',
+    prompt: 'Diagrams?',
+    default: true,
+    remove: ['diagrams/'],
+  };
+  const setup = {
+    title: 'Install diagram dependencies',
+    command: ['uv', 'sync'],
+    cwd: 'diagrams',
+    missing: 'Install uv first.',
+  };
+  const parseSetup = (fields: object) =>
+    parseManifest({
+      version: 3,
+      features: [{ ...diagrams, setup: { ...setup, ...fields } }],
+    }).features[0]?.setup;
+
+  it('accepts a set-up step and defaults requires to the command', () => {
+    expect(parseSetup({})).toStrictEqual({ ...setup, requires: 'uv' });
+  });
+
+  it('defaults cwd to the project root and keeps an explicit requires', () => {
+    expect(parseSetup({ cwd: undefined, requires: 'uvx' })).toStrictEqual({
+      ...setup,
+      cwd: '.',
+      requires: 'uvx',
+    });
+  });
+
+  it.each([
+    ['a missing title', { title: '' }, /needs a "title"/],
+    ['an empty command', { command: [] }, /non-empty array/],
+    ['a string command', { command: 'uv sync' }, /non-empty array/],
+    [
+      'a missing "missing" message',
+      { missing: undefined },
+      /needs a "missing" message/,
+    ],
+    [
+      'a cwd outside the project',
+      { cwd: '../elsewhere' },
+      /must stay inside the project/,
+    ],
+    [
+      'an unknown setup field',
+      { shell: true },
+      /Unknown features.diagrams.setup field\(s\): shell/,
+    ],
+  ])('rejects %s', (_case, fields, message) => {
+    expect(() => parseSetup(fields)).toThrow(message);
+  });
+
+  it('rejects setup in a version 2 manifest (older create-eep would not run it)', () => {
+    expect(() =>
+      parseManifest({ version: 2, features: [{ ...diagrams, setup }] }),
+    ).toThrow(/Unknown features\[0\] field\(s\): setup/);
   });
 });
 
