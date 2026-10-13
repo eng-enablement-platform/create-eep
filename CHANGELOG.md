@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.4.0...v0.5.0) (2026-10-13)
+
+
+### Features
+
+* initialise git and install dependencies after scaffolding ([f49bd78](https://github.com/eng-enablement-platform/create-eep/commit/f49bd782b4302c462da4a5466d854f916dcc7668))
+* refine install steps ([c488bd0](https://github.com/eng-enablement-platform/create-eep/commit/c488bd086f543aa8b8b8030eb446b0933983696e))
+
 ## [0.4.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.3.0...v0.4.0) (2026-10-12)
 
 
