@@ -4,6 +4,7 @@ import { downloadTemplate } from 'giget';
 
 import { runCli } from './cli/run-cli.ts';
 import { createClackUi, createPlainUi } from './cli/ui.ts';
+import { runCommand } from './scaffold/commands.ts';
 
 const stdout = (text: string): void => {
   process.stdout.write(text);
@@ -21,6 +22,8 @@ process.exitCode = await runCli(process.argv, {
   // registry: false - only ever resolve the sources we pass, never giget's own registry.
   download: (source, { dir }) =>
     downloadTemplate(source, { dir, registry: false }),
+  run: runCommand,
+  userAgent: process.env.npm_config_user_agent,
   ui: interactive ? createClackUi() : createPlainUi(stdout, stderr),
   stdout,
   stderr,

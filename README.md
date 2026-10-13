@@ -6,7 +6,7 @@
 
 Scaffold new projects from Engineering Enablement Platform (EEP) templates.
 
-> **Early days.** Dependency install is coming next.
+> **Early days.** Template set-up steps (e.g. diagram dependencies) are coming next.
 
 ## Usage
 
@@ -33,6 +33,10 @@ Note the hyphen with `npx` - it's `create-eep`, not `create eep`.
 Works with any package manager (`pnpm create eep my-app --template next-app`, `yarn create eep ...`, `bunx create-eep ...`).
 Requires Node 22.13 or later.
 
+After downloading, create-eep asks which optional extras to keep, then gets the project ready to run: it initialises a git repository, installs dependencies with the template's package manager, and makes a first commit.
+Without a terminal (CI, scripts, agents) or with `--yes`, it uses the defaults - everything on - so pass `--no-install` / `--no-git` to skip a step.
+A failed install never deletes the project; the summary tells you what to run next.
+
 ### Templates
 
 | Name              | Template                                                                                                                              |
@@ -40,28 +44,27 @@ Requires Node 22.13 or later.
 | `web-dev-starter` | [Web dev starter](https://github.com/eng-enablement-platform/eep-template-web-dev-starter) - plain HTML, CSS and JavaScript (default) |
 | `next-app`        | [Next.js full-stack app](https://github.com/eng-enablement-platform/eep-template-next-app)                                            |
 
-Any public GitHub repo also works as a template:
-
-```bash
-npm create eep@latest my-app -- --template https://github.com/org/repo
-```
+create-eep only scaffolds EEP templates. To copy any other GitHub repository (no history, no set-up), use [giget](https://github.com/unjs/giget): `npx giget gh:org/repo my-app`.
 
 ### Options
 
-| Option                         | Description                                                                 |
-| ------------------------------ | --------------------------------------------------------------------------- |
-| `-t, --template <name-or-url>` | Template name, GitHub repo URL or `gh:org/repo` (default `web-dev-starter`) |
-| `--with <extra>`               | Keep an optional extra the template offers, e.g. `docs` (repeatable)        |
-| `--without <extra>`            | Drop an optional extra the template offers (repeatable)                     |
-| `-y, --yes`                    | Skip prompts and use the defaults                                           |
-| `-v, --version`                | Print the version                                                           |
-| `-h, --help`                   | Show help, including the template list                                      |
+| Option                       | Description                                                                                         |
+| ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| `-t, --template <name>`      | Template to use (default `web-dev-starter`)                                                         |
+| `--ref <ref>`                | Use the template from a branch, tag or commit - e.g. to test a template change                      |
+| `--with <extra>`             | Keep an optional extra the template offers, e.g. `docs` (repeatable)                                |
+| `--without <extra>`          | Drop an optional extra the template offers (repeatable)                                             |
+| `--install` / `--no-install` | Install dependencies (default yes) - uses the template's package manager (e.g. pnpm for `next-app`) |
+| `--git` / `--no-git`         | Initialise a git repository with a first commit (default yes)                                       |
+| `-y, --yes`                  | Skip prompts and use the defaults                                                                   |
+| `-v, --version`              | Print the version                                                                                   |
+| `-h, --help`                 | Show help, including the template list                                                              |
 
 ## For template authors
 
 A template can include an `.eep/` folder that tells create-eep how to turn it into a project.
 create-eep applies it after downloading and then deletes `.eep/`, so it never reaches generated projects.
-Templates without one (including any GitHub repo) are copied as-is.
+Templates without one are copied as-is.
 
 `.eep/template.json`:
 

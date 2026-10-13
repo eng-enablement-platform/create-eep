@@ -21,43 +21,50 @@ export const TEMPLATES: readonly Template[] = [
   },
 ];
 
-// Used when no `--template` is given, until interactive prompts land.
+// Pre-selected in the template prompt, and used when not prompting (CI, `--yes`).
 export const DEFAULT_TEMPLATE_NAME = 'web-dev-starter';
 
-const GITHUB_URL_PATTERN =
-  /^https?:\/\/(?:www\.)?github\.com\/([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/;
+// Branch, tag or commit names: no leading dash (could read as a flag), no `..`.
+const REF_PATTERN = /^(?!-)(?!.*\.\.)[\w./-]+$/;
 
 /**
- * Resolves a `--template` value to a giget source. Accepts a built-in template
- * name, a pasted GitHub repo URL, or a giget `gh:` source as-is.
+ * Checks a `--ref` value is a plausible git branch, tag or commit.
  *
- * @param input - The `--template` value.
- * @returns The giget source, or `undefined` when the input is not recognised.
+ * @param ref - The `--ref` value.
+ * @returns A problem to show, or `undefined` when the ref is usable.
+ * @example
+ * ```ts
+ * validateRef('feat/my-change'); // undefined
+ * validateRef('../oops'); // 'Ref can only contain ...'
+ * ```
+ */
+export function validateRef(ref: string): string | undefined {
+  return REF_PATTERN.test(ref)
+    ? undefined
+    : 'Ref can only contain letters, numbers, ".", "_", "/" and "-", cannot start with "-" and cannot contain "..".';
+}
+
+/**
+ * Resolves a built-in template name to its giget source, optionally pinned to
+ * a branch, tag or commit. Only EEP templates are supported - to copy any
+ * other repository, use giget or degit directly.
+ *
+ * @param name - The `--template` value.
+ * @param ref - Optional branch, tag or commit (`--ref`), e.g. for testing a template change.
+ * @returns The giget source, or `undefined` when the name is not a built-in template.
  * @example
  * ```ts
  * resolveTemplateSource('next-app'); // 'gh:eng-enablement-platform/eep-template-next-app'
- * resolveTemplateSource('https://github.com/org/repo.git'); // 'gh:org/repo'
+ * resolveTemplateSource('next-app', 'feat/x'); // 'gh:eng-enablement-platform/eep-template-next-app#feat/x'
  * ```
  */
-export function resolveTemplateSource(input: string): string | undefined {
-  const builtIn = TEMPLATES.find((template) => template.name === input);
-  if (builtIn) {
-    return builtIn.source;
+export function resolveTemplateSource(
+  name: string,
+  ref?: string,
+): string | undefined {
+  const template = TEMPLATES.find((candidate) => candidate.name === name);
+  if (template === undefined) {
+    return undefined;
   }
-
-  /*
-   * giget does not accept browser URLs - given one it fetches the HTML page
-   * and fails with TAR_BAD_ARCHIVE - so normalise to its `gh:` shorthand.
-   */
-  const githubMatch = GITHUB_URL_PATTERN.exec(input);
-  if (githubMatch) {
-    const [, owner, repo] = githubMatch;
-    return `gh:${String(owner)}/${String(repo)}`;
-  }
-
-  if (input.startsWith('gh:')) {
-    return input;
-  }
-
-  return undefined;
+  return ref === undefined ? template.source : `${template.source}#${ref}`;
 }

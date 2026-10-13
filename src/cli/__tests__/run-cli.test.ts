@@ -20,7 +20,7 @@ import { CANCELLED, createPlainUi } from '../ui.ts';
 type FakeAnswers = {
   projectName?: Answer<string>;
   template?: Answer<string>;
-  /** Answers to optional-extra questions, keyed by the prompt text. */
+  /** Answers to yes/no questions, keyed by the prompt text. Unlisted: the default. */
   confirms?: Record<string, Answer<boolean>>;
 };
 
@@ -34,10 +34,15 @@ const createFakeUi = (answers: FakeAnswers) => {
       Promise.resolve(answers.projectName ?? CANCELLED),
     ),
     askTemplate: vi.fn(() => Promise.resolve(answers.template ?? CANCELLED)),
-    confirm: vi.fn((message: string, _initialValue: boolean) =>
-      Promise.resolve(answers.confirms?.[message] ?? CANCELLED),
+    confirm: vi.fn((message: string, initialValue: boolean) =>
+      Promise.resolve(answers.confirms?.[message] ?? initialValue),
     ),
     startTask: vi.fn(() => ({ succeed: vi.fn(), fail: vi.fn() })),
+    startLogTask: vi.fn(() => ({
+      log: vi.fn(),
+      succeed: vi.fn(),
+      fail: vi.fn(),
+    })),
     success: vi.fn(),
     error: vi.fn((message: string) => errors.push(message)),
     cancelled: vi.fn(),
@@ -71,6 +76,12 @@ const fakeTemplateDownload =
     return Promise.resolve({ dir });
   };
 
+// git and package managers are faked: every command succeeds with no output.
+const okRunner = () =>
+  vi.fn<CliDependencies['run']>(() =>
+    Promise.resolve({ exitCode: 0, output: '' }),
+  );
+
 describe(runCli, () => {
   let cwd: string;
   let download: ReturnType<typeof vi.fn<CliDependencies['download']>>;
@@ -95,6 +106,8 @@ describe(runCli, () => {
       return runCli(['node', 'create-eep', ...args], {
         cwd,
         download,
+        run: okRunner(),
+        userAgent: undefined,
         ui: createPlainUi(stdout, stderr),
         stdout,
         stderr,
@@ -162,11 +175,29 @@ describe(runCli, () => {
       );
     });
 
-    it('downloads from a pasted GitHub URL', async () => {
+    it('rejects a GitHub URL and points to giget for other repositories', async () => {
       expect(
-        await run(['my-app', '--template', 'https://github.com/org/repo.git']),
+        await run(['my-app', '--template', 'https://github.com/org/repo']),
+      ).toBe(1);
+      expect(output.stderr).toContain('Unknown template');
+      expect(output.stderr).toContain('npx giget gh:org/repo my-app');
+      expect(download).not.toHaveBeenCalled();
+    });
+
+    it('downloads a built-in template from a --ref branch', async () => {
+      expect(
+        await run(['my-app', '-t', 'next-app', '--ref', 'feat/my-change']),
       ).toBe(0);
-      expect(download).toHaveBeenCalledWith('gh:org/repo', expect.anything());
+      expect(download).toHaveBeenCalledWith(
+        'gh:eng-enablement-platform/eep-template-next-app#feat/my-change',
+        expect.anything(),
+      );
+    });
+
+    it('rejects an invalid --ref before downloading', async () => {
+      expect(await run(['my-app', '--ref', '../oops'])).toBe(1);
+      expect(output.stderr).toContain('Invalid --ref "../oops"');
+      expect(download).not.toHaveBeenCalled();
     });
 
     it('reports a failed download as a friendly error', async () => {
@@ -239,6 +270,8 @@ describe(runCli, () => {
       runCli(['node', 'create-eep', ...args], {
         cwd,
         download,
+        run: okRunner(),
+        userAgent: undefined,
         ui,
         stdout: vi.fn(),
         stderr: vi.fn(),
@@ -346,12 +379,16 @@ describe(runCli, () => {
       });
 
       expect(await run(['my-app', '--without', 'docs'], ui)).toBe(0);
-      expect(ui.confirm).toHaveBeenCalledExactlyOnceWith('Diagrams?', true);
+      expect(ui.confirm).toHaveBeenCalledWith('Diagrams?', true);
+      expect(ui.confirm).not.toHaveBeenCalledWith('Docs?', expect.anything());
     });
 
     it('removes the downloaded project when an extra question is cancelled', async () => {
       download.mockImplementationOnce(fakeTemplateDownload(FEATURES_MANIFEST));
-      const { ui } = createFakeUi({ template: 'next-app' });
+      const { ui } = createFakeUi({
+        template: 'next-app',
+        confirms: { 'Docs?': CANCELLED },
+      });
 
       expect(await run(['my-app'], ui)).toBe(130);
       expect(ui.cancelled).toHaveBeenCalledOnce();

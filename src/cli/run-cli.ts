@@ -2,6 +2,7 @@ import { Command, CommanderError } from 'commander';
 
 import packageJson from '../../package.json' with { type: 'json' };
 import { applyManifest, loadManifest } from '../scaffold/apply-manifest.ts';
+import type { RunCommand } from '../scaffold/commands.ts';
 import type { Downloader } from '../scaffold/create-project.ts';
 import {
   checkDestination,
@@ -16,7 +17,14 @@ import {
   DEFAULT_TEMPLATE_NAME,
   resolveTemplateSource,
   TEMPLATES,
+  validateRef,
 } from '../templates/registry.ts';
+import type { FinishChoices } from './finish-project.ts';
+import {
+  askFinishChoices,
+  finishProject,
+  inspectProject,
+} from './finish-project.ts';
 import type { Ui } from './ui.ts';
 import { CANCELLED } from './ui.ts';
 
@@ -24,6 +32,10 @@ import { CANCELLED } from './ui.ts';
 export type CliDependencies = {
   cwd: string;
   download: Downloader;
+  /** Runs git and the package manager. */
+  run: RunCommand;
+  /** `npm_config_user_agent` - which package manager ran create-eep. */
+  userAgent: string | undefined;
   ui: Ui;
   /** Commander's own output (`--help`, `--version`, argument errors). */
   stdout: (text: string) => void;
@@ -32,7 +44,11 @@ export type CliDependencies = {
 
 type CliOptions = {
   template: string;
+  ref?: string;
   yes?: boolean;
+  // Undefined unless --install/--no-install or --git/--no-git is given.
+  install?: boolean;
+  git?: boolean;
   // Undefined when not given - no default, so --help doesn't show "(default: [])".
   with?: string[];
   without?: string[];
@@ -74,7 +90,7 @@ export async function runCli(
   argv: readonly string[],
   dependencies: CliDependencies,
 ): Promise<number> {
-  const { cwd, download, ui, stdout, stderr } = dependencies;
+  const { cwd, download, run, userAgent, ui, stdout, stderr } = dependencies;
 
   const program = new Command()
     .name('create-eep')
@@ -83,12 +99,16 @@ export async function runCli(
     )
     .version(packageJson.version, '-v, --version')
     .argument('[project-name]', 'directory to create the project in')
+    .option('-t, --template <name>', 'template to use', DEFAULT_TEMPLATE_NAME)
     .option(
-      '-t, --template <name-or-url>',
-      'template name, GitHub repo URL or gh:org/repo source',
-      DEFAULT_TEMPLATE_NAME,
+      '--ref <ref>',
+      'use the template from a branch, tag or commit (e.g. to test a template change)',
     )
     .option('-y, --yes', 'skip prompts and use the defaults')
+    .option('--install', 'install dependencies (the default)')
+    .option('--no-install', 'skip installing dependencies')
+    .option('--git', 'initialise a git repository (the default)')
+    .option('--no-git', 'skip initialising a git repository')
     .option(
       '--with <extra>',
       'keep an optional extra the template offers, e.g. docs (repeatable)',
@@ -122,6 +142,15 @@ export async function runCli(
   const templateWasGiven = program.getOptionValueSource('template') === 'cli';
 
   ui.intro(packageJson.version);
+
+  // Checked before any prompt, so a typo doesn't waste the user's answers.
+  if (options.ref !== undefined) {
+    const refProblem = validateRef(options.ref);
+    if (refProblem !== undefined) {
+      ui.error(`Invalid --ref "${options.ref}". ${refProblem}`);
+      return 1;
+    }
+  }
 
   // ── Project name ─────────────────────────────────────────────────────────
   let projectName = program.args[0];
@@ -166,10 +195,10 @@ export async function runCli(
     template = answer;
   }
 
-  const templateSource = resolveTemplateSource(template);
+  const templateSource = resolveTemplateSource(template, options.ref);
   if (templateSource === undefined) {
     ui.error(
-      `Unknown template "${template}".\n\nAvailable templates:\n${templateList}\n\nOr pass a GitHub repo URL.`,
+      `Unknown template "${template}".\n\nAvailable templates:\n${templateList}\n\ncreate-eep only scaffolds EEP templates. To copy any other GitHub repository, use giget:\n  npx giget gh:org/repo my-app`,
     );
     return 1;
   }
@@ -198,6 +227,9 @@ export async function runCli(
    * From here the directory exists - remove it on any failure or cancel so
    * nothing half-made is left behind.
    */
+  const finishFlags = { git: options.git, install: options.install };
+  let facts: Awaited<ReturnType<typeof inspectProject>>;
+  let finishChoices: FinishChoices;
   try {
     // ── Optional extras ──────────────────────────────────────────────────────
     const manifest = await loadManifest(projectDir);
@@ -220,6 +252,21 @@ export async function runCli(
       decided[feature.id] = answer;
     }
 
+    // ── Git + install questions - asked now, before anything slow runs ───────
+    facts = await inspectProject(projectDir, run, userAgent);
+    const finishAnswer = await askFinishChoices(
+      facts,
+      finishFlags,
+      ui,
+      canPrompt,
+    );
+    if (finishAnswer === CANCELLED) {
+      await removeProject(projectDir);
+      ui.cancelled();
+      return CANCELLED_EXIT_CODE;
+    }
+    finishChoices = finishAnswer;
+
     // ── Set up ───────────────────────────────────────────────────────────────
     if (manifest !== undefined) {
       const setupTask = ui.startTask('Setting up your project');
@@ -241,7 +288,19 @@ export async function runCli(
     throw error;
   }
 
-  ui.success(`Created ${projectName} at ${projectDir}`, [`cd ${projectName}`]);
+  /*
+   * ── Git + install ─────────────────────────────────────────────────────────
+   * Outside the clean-up block: a failed install doesn't make the project
+   * invalid, so it's kept and the failure becomes a note.
+   */
+  const { nextSteps, notes } = await finishProject(
+    facts,
+    finishChoices,
+    finishFlags,
+    { projectDir, projectName, ui, run },
+  );
+
+  ui.success(`Created ${projectName} at ${projectDir}`, nextSteps, notes);
   return 0;
 }
 

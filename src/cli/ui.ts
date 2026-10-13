@@ -18,6 +18,12 @@ export type Task = {
   fail: (message: string) => void;
 };
 
+/** A long-running command whose output is shown live (e.g. a dependency install). */
+export type LogTask = Task & {
+  /** One line of the command's output. */
+  log: (line: string) => void;
+};
+
 /**
  * Everything the CLI shows or asks. Injected into `runCli` so tests can drive
  * prompts without a terminal, and so CI gets plain text instead of animations.
@@ -34,7 +40,13 @@ export type Ui = {
   /** Yes/no question - `initialValue` is pre-selected. */
   confirm: (message: string, initialValue: boolean) => Promise<Answer<boolean>>;
   startTask: (message: string) => Task;
-  success: (message: string, nextSteps: readonly string[]) => void;
+  startLogTask: (title: string) => LogTask;
+  /** `notes` are things the user still needs to know or do (e.g. a missing tool). */
+  success: (
+    message: string,
+    nextSteps: readonly string[],
+    notes?: readonly string[],
+  ) => void;
   error: (message: string) => void;
   cancelled: () => void;
 };
@@ -93,7 +105,26 @@ export function createClackUi(): Ui {
         },
       };
     },
-    success: (message, nextSteps) => {
+    startLogTask: (title) => {
+      // Shows the output in a scrolling window while it runs, then collapses it.
+      const log = prompts.taskLog({ title, limit: 8 });
+      return {
+        log: (line) => {
+          log.message(line);
+        },
+        succeed: (message) => {
+          log.success(message);
+        },
+        // Keep the output on failure - it's what explains the error.
+        fail: (message) => {
+          log.error(pc.red(message), { showLog: true });
+        },
+      };
+    },
+    success: (message, nextSteps, notes = []) => {
+      for (const note of notes) {
+        prompts.log.warn(note);
+      }
       prompts.note(
         nextSteps.map((step) => pc.cyan(step)).join('\n'),
         'Next steps',
@@ -140,7 +171,24 @@ export function createPlainUi(
         fail: () => undefined,
       };
     },
-    success: (message, nextSteps) => {
+    startLogTask: (title) => {
+      stdout(`${title}...\n`);
+      return {
+        log: (line) => {
+          stdout(`  ${line}\n`);
+        },
+        succeed: (message) => {
+          stdout(`${message}\n`);
+        },
+        fail: (message) => {
+          stderr(`${message}\n`);
+        },
+      };
+    },
+    success: (message, nextSteps, notes = []) => {
+      for (const note of notes) {
+        stdout(`Note: ${note}\n`);
+      }
       stdout(
         `\n${message}\n\nNext steps:\n${nextSteps.map((step) => `  ${step}`).join('\n')}\n`,
       );
