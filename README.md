@@ -1,10 +1,22 @@
-# create-eep
+<p align="center">
+  <img src=".github/assets/eep-logo-full.svg" alt="EEP" width="360" />
+</p>
 
-[![CI](https://github.com/eng-enablement-platform/create-eep/actions/workflows/ci.yml/badge.svg)](https://github.com/eng-enablement-platform/create-eep/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/create-eep)](https://www.npmjs.com/package/create-eep)
-[![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+<h1 align="center">create-eep</h1>
 
-Scaffold new projects from Engineering Enablement Platform (EEP) templates.
+<p align="center">
+  <a href="https://github.com/eng-enablement-platform/create-eep/actions/workflows/ci.yml">
+    <img src="https://github.com/eng-enablement-platform/create-eep/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  </a>
+  <a href="https://www.npmjs.com/package/create-eep">
+    <img src="https://img.shields.io/npm/v/create-eep" alt="npm" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
+  </a>
+</p>
+
+<p align="center">Scaffold new projects from Engineering Enablement Platform (EEP) templates.</p>
 
 ## Usage
 
