@@ -58,6 +58,14 @@ Commit types drive releases: `feat:` and `fix:` end up in the changelog and deci
 - **Keep it small and in scope.** Don't bundle unrelated work. For large changes, stack PRs rather than opening one giant diff.
 - **Stay on it after it's up.** Once threads are resolved and approvals are in, merge promptly.
 
+## Releasing
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please) - never bump the version or edit `CHANGELOG.md` by hand.
+
+1. Commit to `main` with [conventional commits](https://www.conventionalcommits.org/) - `fix:` means a patch release, `feat:` a minor one (`docs:`, `chore:`, `ci:` and `test:` don't trigger a release).
+2. release-please keeps a single **Release PR** open with the next version and changelog, updating it on every push.
+3. Merge the Release PR to release: it tags the commit, creates a GitHub Release, and the `publish` job publishes to npm via OIDC trusted publishing (with provenance).
+
 ## Security
 
-Never report vulnerabilities in a public issue - see [SECURITY.md](.github/SECURITY.md).
+See [SECURITY.md](.github/SECURITY.md).

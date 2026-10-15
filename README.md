@@ -1,12 +1,22 @@
-# create-eep
+<p align="center">
+  <img src=".github/assets/eep-logo-full.svg" alt="EEP" width="360" />
+</p>
 
-[![CI](https://github.com/eng-enablement-platform/create-eep/actions/workflows/ci.yml/badge.svg)](https://github.com/eng-enablement-platform/create-eep/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/create-eep)](https://www.npmjs.com/package/create-eep)
-[![license: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+<h1 align="center">create-eep</h1>
 
-Scaffold new projects from Engineering Enablement Platform (EEP) templates.
+<p align="center">
+  <a href="https://github.com/eng-enablement-platform/create-eep/actions/workflows/ci.yml">
+    <img src="https://github.com/eng-enablement-platform/create-eep/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  </a>
+  <a href="https://www.npmjs.com/package/create-eep">
+    <img src="https://img.shields.io/npm/v/create-eep" alt="npm" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
+  </a>
+</p>
 
-> **Early days.** Feedback welcome - see [CONTRIBUTING.md](CONTRIBUTING.md).
+<p align="center">Scaffold new projects from Engineering Enablement Platform (EEP) templates.</p>
 
 ## Usage
 
@@ -156,20 +166,6 @@ Open the coverage report after `pnpm test:coverage`:
 open coverage/index.html
 ```
 
-## Releasing
-
-Releases are automated with [release-please](https://github.com/googleapis/release-please) - never bump the version or edit `CHANGELOG.md` by hand.
-
-1. Commit to `main` with [conventional commits](https://www.conventionalcommits.org/) - `fix:` means a patch release, `feat:` a minor one (`docs:`, `chore:`, `ci:` and `test:` don't trigger a release).
-2. release-please keeps a single **Release PR** open with the next version and changelog, updating it on every push.
-3. Merge the Release PR to release: it tags the commit, creates a GitHub Release, and the `publish` job publishes to npm via OIDC trusted publishing (with provenance).
-
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Agents (and humans) should also follow [AGENTS.md](AGENTS.md).
-
-Found a security issue? Please report it privately - see [SECURITY.md](.github/SECURITY.md).
-
-## License
-
-[MIT](LICENSE)
+See [CONTRIBUTING.md](CONTRIBUTING.md).
