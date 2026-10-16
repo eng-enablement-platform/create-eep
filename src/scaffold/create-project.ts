@@ -2,6 +2,9 @@ import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
+import type { DownloadTarget } from './download-errors.ts';
+import { describeDownloadError } from './download-errors.ts';
+
 /** Downloads a template into a directory - giget's `downloadTemplate` in production. */
 export type Downloader = (
   source: string,
@@ -36,9 +39,8 @@ export function checkDestination(
     : undefined;
 }
 
-type DownloadProjectOptions = {
+type DownloadProjectOptions = DownloadTarget & {
   projectName: string;
-  templateSource: string;
   cwd: string;
   download: Downloader;
 };
@@ -47,18 +49,18 @@ type DownloadProjectOptions = {
  * Downloads a template into a new `<cwd>/<projectName>` directory. The
  * downloader is injected so tests can check the decisions without a network.
  *
- * @param options - Project name, giget source, working directory and downloader.
+ * @param options - Project name, template (name, giget source, ref), working directory and downloader.
  * @returns The absolute path of the downloaded project.
  * @example
  * ```ts
- * const dir = await downloadProject({ projectName: 'my-app', templateSource: 'gh:org/repo', cwd, download });
+ * const dir = await downloadProject({ projectName: 'my-app', templateName: 'next-app', templateSource: 'gh:org/repo', cwd, download });
  * ```
  */
 export async function downloadProject({
   projectName,
-  templateSource,
   cwd,
   download,
+  ...target
 }: DownloadProjectOptions): Promise<string> {
   // Re-checked here so the guarantee holds even if a caller skipped it.
   const destinationProblem = checkDestination(cwd, projectName);
@@ -67,15 +69,12 @@ export async function downloadProject({
   }
 
   try {
-    const { dir } = await download(templateSource, {
+    const { dir } = await download(target.templateSource, {
       dir: path.resolve(cwd, projectName),
     });
     return dir;
   } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    throw new CreateProjectError(
-      `Could not download template "${templateSource}": ${reason}`,
-    );
+    throw new CreateProjectError(describeDownloadError(error, target));
   }
 }
 
