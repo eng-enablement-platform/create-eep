@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.5.0...v0.6.0) (2026-10-16)
+
+
+### Features
+
+* add specific methods for download errors ([be3d949](https://github.com/eng-enablement-platform/create-eep/commit/be3d9495a147c074f76759735eea121cbaa0c90e))
+* add specific methods for download errors ([c07bcb5](https://github.com/eng-enablement-platform/create-eep/commit/c07bcb5effcec04a08ae944f927da5f3c086dfd3))
+
 ## [0.5.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.4.0...v0.5.0) (2026-10-13)
 
 
