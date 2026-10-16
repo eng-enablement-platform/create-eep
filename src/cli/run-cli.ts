@@ -209,7 +209,9 @@ export async function runCli(
   try {
     projectDir = await downloadProject({
       projectName,
+      templateName: template,
       templateSource,
+      ...(options.ref === undefined ? {} : { ref: options.ref }),
       cwd,
       download,
     });

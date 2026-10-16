@@ -200,12 +200,18 @@ describe(runCli, () => {
       expect(download).not.toHaveBeenCalled();
     });
 
-    it('reports a failed download as a friendly error', async () => {
-      download.mockRejectedValueOnce(new Error('404 Not Found'));
+    it('explains a failed download in terms of what the user asked for', async () => {
+      download.mockRejectedValueOnce(
+        new Error(
+          'Failed to download https://api.github.com/repos/org/repo/tarball/no-such-branch: 404 Not Found',
+        ),
+      );
 
-      expect(await run(['my-app'])).toBe(1);
-      expect(output.stderr).toContain('Could not download template');
-      expect(output.stderr).toContain('404 Not Found');
+      expect(await run(['my-app', '--ref', 'no-such-branch'])).toBe(1);
+      expect(output.stderr).toContain(
+        'Couldn\'t find "no-such-branch" in the web-dev-starter template',
+      );
+      expect(output.stderr).toContain('Details:');
     });
 
     const downloadTemplateWithManifest = (manifest: string) =>
