@@ -80,6 +80,9 @@ jobs:
       - uses: ./.github/actions/prepare
       - run: pnpm build
       - run: pnpm lint:package
+      # The built CLI against a local fake GitHub - download, release lookup
+      # and error messages, without the network.
+      - run: pnpm test:integration
       # Pack, install the tarball into an empty project with npm, run the bin -
       # the same path `npx create-eep` takes for a user - including a real
       # template download. The read-only job token avoids GitHub API rate

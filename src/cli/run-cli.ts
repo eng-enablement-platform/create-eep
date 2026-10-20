@@ -10,12 +10,13 @@ import {
   downloadProject,
   removeProject,
 } from '../scaffold/create-project.ts';
+import type { FindLatestRelease } from '../scaffold/latest-release.ts';
 import { validateProjectName } from '../scaffold/project-name.ts';
 import type { FeatureChoices, SetupStep } from '../templates/manifest.ts';
 import { ManifestError, resolveFeatureFlags } from '../templates/manifest.ts';
 import {
   DEFAULT_TEMPLATE_NAME,
-  resolveTemplateSource,
+  findTemplate,
   TEMPLATES,
   validateRef,
 } from '../templates/registry.ts';
@@ -32,6 +33,8 @@ import { CANCELLED } from './ui.ts';
 export type CliDependencies = {
   cwd: string;
   download: Downloader;
+  /** Looks up a template's latest release - used when there is no `--ref`. */
+  findLatestRelease: FindLatestRelease;
   /** Runs git and the package manager. */
   run: RunCommand;
   /** `npm_config_user_agent` - which package manager ran create-eep. */
@@ -90,7 +93,16 @@ export async function runCli(
   argv: readonly string[],
   dependencies: CliDependencies,
 ): Promise<number> {
-  const { cwd, download, run, userAgent, ui, stdout, stderr } = dependencies;
+  const {
+    cwd,
+    download,
+    findLatestRelease,
+    run,
+    userAgent,
+    ui,
+    stdout,
+    stderr,
+  } = dependencies;
 
   const program = new Command()
     .name('create-eep')
@@ -102,7 +114,7 @@ export async function runCli(
     .option('-t, --template <name>', 'template to use', DEFAULT_TEMPLATE_NAME)
     .option(
       '--ref <ref>',
-      'use the template from a branch, tag or commit (e.g. to test a template change)',
+      'use the template from a branch, tag or commit instead of its latest release (e.g. main, or a branch to test a template change)',
     )
     .option('-y, --yes', 'skip prompts and use the defaults')
     .option('--install', 'install dependencies (the default)')
@@ -195,8 +207,8 @@ export async function runCli(
     template = answer;
   }
 
-  const templateSource = resolveTemplateSource(template, options.ref);
-  if (templateSource === undefined) {
+  const selectedTemplate = findTemplate(template);
+  if (selectedTemplate === undefined) {
     ui.error(
       `Unknown template "${template}".\n\nAvailable templates:\n${templateList}\n\ncreate-eep only scaffolds EEP templates. To copy any other GitHub repository, use giget:\n  npx giget gh:org/repo my-app`,
     );
@@ -207,15 +219,20 @@ export async function runCli(
   const downloadTask = ui.startTask(`Downloading the "${template}" template`);
   let projectDir: string;
   try {
-    projectDir = await downloadProject({
+    const downloaded = await downloadProject({
       projectName,
       templateName: template,
-      templateSource,
+      repository: selectedTemplate.repository,
       ...(options.ref === undefined ? {} : { ref: options.ref }),
       cwd,
       download,
+      findLatestRelease,
     });
-    downloadTask.succeed(`Downloaded the "${template}" template`);
+    projectDir = downloaded.dir;
+    // Say which version was used - a release tag, the --ref, or main when there are no releases.
+    downloadTask.succeed(
+      `Downloaded the "${template}" template (${downloaded.ref ?? 'main - no releases yet'})`,
+    );
   } catch (error) {
     if (error instanceof CreateProjectError) {
       downloadTask.fail('Download failed');

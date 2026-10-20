@@ -53,6 +53,7 @@ Filter: if you can break it by changing a branch, a flag's effect, or a file-sys
 
 - **Pure logic** (arg parsing, URL normalising, template lookup) - always test
 - **Side effects** (downloads, file writes, running install commands) - inject the dependency and test the decision, not the network
+- **The built CLI end to end** - `pnpm test:integration` runs `dist/` as a real process against a local fake GitHub (`src/__tests__/fake-github.ts`): release lookup, giget's download and extraction, the manifest, and error messages. `*.integration.test.ts`, kept out of `pnpm test`
 - **The published artifact** - covered by `pnpm smoke`, not unit tests
 - TDD for small isolated units with a clear contract; not for exploratory integration work
 - Co-locate tests in a `__tests__/` subfolder next to the code (`src/cli/__tests__/parse-args.test.ts`)

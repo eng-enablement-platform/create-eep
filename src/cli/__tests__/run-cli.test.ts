@@ -85,11 +85,18 @@ const okRunner = () =>
 describe(runCli, () => {
   let cwd: string;
   let download: ReturnType<typeof vi.fn<CliDependencies['download']>>;
+  let findLatestRelease: ReturnType<
+    typeof vi.fn<CliDependencies['findLatestRelease']>
+  >;
 
   beforeEach(() => {
     cwd = mkdtempSync(path.join(tmpdir(), 'create-eep-test-'));
     download = vi.fn<CliDependencies['download']>((_source, { dir }) =>
       Promise.resolve({ dir }),
+    );
+    // No releases by default, so downloads come from main.
+    findLatestRelease = vi.fn<CliDependencies['findLatestRelease']>(() =>
+      Promise.resolve(undefined),
     );
   });
 
@@ -106,6 +113,7 @@ describe(runCli, () => {
       return runCli(['node', 'create-eep', ...args], {
         cwd,
         download,
+        findLatestRelease,
         run: okRunner(),
         userAgent: undefined,
         ui: createPlainUi(stdout, stderr),
@@ -194,6 +202,46 @@ describe(runCli, () => {
       );
     });
 
+    it("downloads the template's latest release and says which", async () => {
+      findLatestRelease.mockResolvedValueOnce('v1.2.0');
+
+      expect(await run(['my-app', '-t', 'next-app'])).toBe(0);
+      expect(findLatestRelease).toHaveBeenCalledWith(
+        'eng-enablement-platform/eep-template-next-app',
+      );
+      expect(download).toHaveBeenCalledWith(
+        'gh:eng-enablement-platform/eep-template-next-app#v1.2.0',
+        expect.anything(),
+      );
+      expect(output.stdout).toContain(
+        'Downloaded the "next-app" template (v1.2.0)',
+      );
+    });
+
+    it('falls back to main when the template has no releases', async () => {
+      expect(await run(['my-app'])).toBe(0);
+      expect(output.stdout).toContain('(main - no releases yet)');
+    });
+
+    it('uses --ref instead of looking up the latest release', async () => {
+      expect(await run(['my-app', '--ref', 'main'])).toBe(0);
+      expect(findLatestRelease).not.toHaveBeenCalled();
+      expect(download).toHaveBeenCalledWith(
+        'gh:eng-enablement-platform/eep-template-web-dev-starter#main',
+        expect.anything(),
+      );
+      expect(output.stdout).toContain('(main)');
+    });
+
+    it('stops with a clear error when GitHub cannot be reached for the release lookup', async () => {
+      findLatestRelease.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+      expect(await run(['my-app'])).toBe(1);
+      expect(output.stderr).toContain("Couldn't reach GitHub");
+      expect(download).not.toHaveBeenCalled();
+      expect(existsSync(path.join(cwd, 'my-app'))).toBe(false);
+    });
+
     it('rejects an invalid --ref before downloading', async () => {
       expect(await run(['my-app', '--ref', '../oops'])).toBe(1);
       expect(output.stderr).toContain('Invalid --ref "../oops"');
@@ -276,6 +324,7 @@ describe(runCli, () => {
       runCli(['node', 'create-eep', ...args], {
         cwd,
         download,
+        findLatestRelease,
         run: okRunner(),
         userAgent: undefined,
         ui,

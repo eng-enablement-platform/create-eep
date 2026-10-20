@@ -4,13 +4,9 @@ import { describeDownloadError } from '../download-errors.ts';
 
 const target = {
   templateName: 'next-app',
-  templateSource: 'gh:eng-enablement-platform/eep-template-next-app',
+  repository: 'eng-enablement-platform/eep-template-next-app',
 };
-const withRef = {
-  ...target,
-  templateSource: 'gh:eng-enablement-platform/eep-template-next-app#feat/x',
-  ref: 'feat/x',
-};
+const withRef = { ...target, ref: 'feat/x' };
 
 // Shaped like giget's errors: "Failed to download <url>: <status> <text>".
 const httpError = (status: string) =>
@@ -35,7 +31,6 @@ describe(describeDownloadError, () => {
     expect(message).toContain(
       'https://github.com/eng-enablement-platform/eep-template-next-app',
     );
-    expect(message).not.toContain('#feat/x');
   });
 
   it('suggests the latest create-eep when the template itself is missing', () => {
@@ -93,7 +88,7 @@ describe(describeDownloadError, () => {
 
   it('falls back to the raw error when it is not recognised', () => {
     expect(describeDownloadError(new Error('Disk full'), target)).toBe(
-      'Could not download template "gh:eng-enablement-platform/eep-template-next-app": Disk full',
+      'Could not download the next-app template: Disk full',
     );
   });
 

@@ -2,8 +2,8 @@
 export type DownloadTarget = {
   /** Built-in template name, e.g. `web-dev-starter`. */
   templateName: string;
-  /** giget source, e.g. `gh:eng-enablement-platform/eep-template-web-dev-starter#main`. */
-  templateSource: string;
+  /** GitHub repository, e.g. `eng-enablement-platform/eep-template-web-dev-starter`. */
+  repository: string;
   /** The `--ref` value, when given. */
   ref?: string;
 };
@@ -39,10 +39,6 @@ const isNetworkError = (error: unknown, message: string): boolean =>
   message.includes('fetch failed') ||
   errorCodes(error).some((code) => NETWORK_ERROR_CODES.has(code));
 
-// `gh:org/repo#ref` -> `https://github.com/org/repo`
-const repositoryUrl = (templateSource: string): string =>
-  `https://github.com/${templateSource.replace(/^gh:/, '').replace(/#.*$/, '')}`;
-
 const explain = (
   status: number | undefined,
   statusText: string,
@@ -51,7 +47,7 @@ const explain = (
   if (status === 404) {
     return target.ref === undefined
       ? `The ${target.templateName} template couldn't be found on GitHub. Try the latest create-eep: npx create-eep@latest`
-      : `Couldn't find "${target.ref}" in the ${target.templateName} template. Check the branch, tag or commit exists: ${repositoryUrl(target.templateSource)}`;
+      : `Couldn't find "${target.ref}" in the ${target.templateName} template. Check the branch, tag or commit exists: https://github.com/${target.repository}`;
   }
   if (status === 403 || status === 429) {
     return [
@@ -79,7 +75,7 @@ const explain = (
  * @returns A message safe to show the user as-is.
  * @example
  * ```ts
- * describeDownloadError(new Error('Failed to download <url>: 404 Not Found'), { templateName: 'next-app', templateSource, ref: 'feat/x' });
+ * describeDownloadError(new Error('Failed to download <url>: 404 Not Found'), { templateName: 'next-app', repository, ref: 'feat/x' });
  * // 'Couldn't find "feat/x" in the next-app template. ...\n\nDetails: Failed to download <url>: 404 Not Found'
  * ```
  */
@@ -96,6 +92,6 @@ export function describeDownloadError(
     : explain(status, match?.[2] ?? '', target);
 
   return explanation === undefined
-    ? `Could not download template "${target.templateSource}": ${message}`
+    ? `Could not download the ${target.templateName} template: ${message}`
     : `${explanation}\n\nDetails: ${message}`;
 }
