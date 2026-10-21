@@ -4,20 +4,20 @@ export type Template = {
   name: string;
   /** One-line description shown in `--help`. */
   description: string;
-  /** giget source - `gh:<org>/<repo>`. */
-  source: string;
+  /** GitHub repository - `<org>/<repo>`. */
+  repository: string;
 };
 
 export const TEMPLATES: readonly Template[] = [
   {
     name: 'web-dev-starter',
     description: 'Web dev starter - plain HTML, CSS and JavaScript',
-    source: 'gh:eng-enablement-platform/eep-template-web-dev-starter',
+    repository: 'eng-enablement-platform/eep-template-web-dev-starter',
   },
   {
     name: 'next-app',
     description: 'Next.js full-stack app',
-    source: 'gh:eng-enablement-platform/eep-template-next-app',
+    repository: 'eng-enablement-platform/eep-template-next-app',
   },
 ];
 
@@ -45,26 +45,33 @@ export function validateRef(ref: string): string | undefined {
 }
 
 /**
- * Resolves a built-in template name to its giget source, optionally pinned to
- * a branch, tag or commit. Only EEP templates are supported - to copy any
- * other repository, use giget or degit directly.
+ * Looks up a built-in template by name. Only EEP templates are supported - to
+ * copy any other repository, use giget or degit directly.
  *
  * @param name - The `--template` value.
- * @param ref - Optional branch, tag or commit (`--ref`), e.g. for testing a template change.
- * @returns The giget source, or `undefined` when the name is not a built-in template.
+ * @returns The template, or `undefined` when the name is not a built-in template.
  * @example
  * ```ts
- * resolveTemplateSource('next-app'); // 'gh:eng-enablement-platform/eep-template-next-app'
- * resolveTemplateSource('next-app', 'feat/x'); // 'gh:eng-enablement-platform/eep-template-next-app#feat/x'
+ * findTemplate('next-app')?.repository; // 'eng-enablement-platform/eep-template-next-app'
  * ```
  */
-export function resolveTemplateSource(
-  name: string,
-  ref?: string,
-): string | undefined {
-  const template = TEMPLATES.find((candidate) => candidate.name === name);
-  if (template === undefined) {
-    return undefined;
-  }
-  return ref === undefined ? template.source : `${template.source}#${ref}`;
+export function findTemplate(name: string): Template | undefined {
+  return TEMPLATES.find((candidate) => candidate.name === name);
+}
+
+/**
+ * Builds the giget source for a template repository, optionally pinned to a
+ * branch, tag or commit. Without a ref, giget downloads `main`.
+ *
+ * @param repository - `<org>/<repo>`.
+ * @param ref - Optional branch, tag or commit.
+ * @returns The giget source.
+ * @example
+ * ```ts
+ * templateSource('org/repo'); // 'gh:org/repo'
+ * templateSource('org/repo', 'v1.0.0'); // 'gh:org/repo#v1.0.0'
+ * ```
+ */
+export function templateSource(repository: string, ref?: string): string {
+  return ref === undefined ? `gh:${repository}` : `gh:${repository}#${ref}`;
 }

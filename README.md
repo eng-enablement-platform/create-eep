@@ -54,6 +54,9 @@ A failed install never deletes the project; the summary tells you what to run ne
 | `web-dev-starter` | [Web dev starter](https://github.com/eng-enablement-platform/eep-template-web-dev-starter) - plain HTML, CSS and JavaScript (default) |
 | `next-app`        | [Next.js full-stack app](https://github.com/eng-enablement-platform/eep-template-next-app)                                            |
 
+Each template is downloaded from its latest release (e.g. `v1.0.0`), or from `main` if it has no releases yet.
+Use `--ref main` for the latest unreleased changes, or `--ref <tag>` to pin a version.
+
 create-eep only scaffolds EEP templates. To copy any other GitHub repository (no history, no set-up), use [giget](https://github.com/unjs/giget): `npx giget gh:org/repo my-app`.
 
 ### Options
@@ -61,7 +64,7 @@ create-eep only scaffolds EEP templates. To copy any other GitHub repository (no
 | Option                       | Description                                                                                         |
 | ---------------------------- | --------------------------------------------------------------------------------------------------- |
 | `-t, --template <name>`      | Template to use (default `web-dev-starter`)                                                         |
-| `--ref <ref>`                | Use the template from a branch, tag or commit - e.g. to test a template change                      |
+| `--ref <ref>`                | Use a branch, tag or commit instead of the latest release - e.g. `main`, or a template change       |
 | `--with <extra>`             | Keep an optional extra the template offers, e.g. `docs` (repeatable)                                |
 | `--without <extra>`          | Drop an optional extra the template offers (repeatable)                                             |
 | `--install` / `--no-install` | Install dependencies (default yes) - uses the template's package manager (e.g. pnpm for `next-app`) |
@@ -136,23 +139,24 @@ pnpm install
 SKIP_CHECKS=1 git commit -m "wip: ..."
 ```
 
-| Command               | What it does                                                                               |
-| --------------------- | ------------------------------------------------------------------------------------------ |
-| `pnpm dev`            | Run the CLI from source, e.g. `pnpm dev my-app --template web-dev-starter` (no build step) |
-| `pnpm test`           | Run the test suite once                                                                    |
-| `pnpm test:watch`     | Re-run tests on file changes                                                               |
-| `pnpm test:coverage`  | Run tests with a coverage report (HTML report in `coverage/`)                              |
-| `pnpm typecheck`      | Type-check with `tsc` (no output emitted)                                                  |
-| `pnpm lint`           | Lint with ESLint (fails on any warning)                                                    |
-| `pnpm lint:fix`       | Lint and auto-fix what can be fixed                                                        |
-| `pnpm lint:probe`     | Check the ESLint config still enforces each rule                                           |
-| `pnpm lint:workflows` | Lint GitHub Actions workflows with actionlint (+ shellcheck on `run:` steps)               |
-| `pnpm lint:shell`     | Lint the pre-commit hook and `scripts/*.sh` with shellcheck                                |
-| `pnpm format`         | Format all files with Prettier                                                             |
-| `pnpm format:check`   | Check formatting without writing changes                                                   |
-| `pnpm build`          | Bundle the CLI into `dist/index.mjs` with tsdown                                           |
-| `pnpm lint:package`   | Check the package is publishable (`bin`, `files`, ...) with publint                        |
-| `pnpm smoke`          | Build, pack, install the tarball into a temp project and run it                            |
+| Command                 | What it does                                                                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
+| `pnpm dev`              | Run the CLI from source, e.g. `pnpm dev my-app --template web-dev-starter` (no build step)   |
+| `pnpm test`             | Run the test suite once                                                                      |
+| `pnpm test:watch`       | Re-run tests on file changes                                                                 |
+| `pnpm test:coverage`    | Run tests with a coverage report (HTML report in `coverage/`)                                |
+| `pnpm test:integration` | Build, then run the built CLI against a local fake GitHub (download, release lookup, errors) |
+| `pnpm typecheck`        | Type-check with `tsc` (no output emitted)                                                    |
+| `pnpm lint`             | Lint with ESLint (fails on any warning)                                                      |
+| `pnpm lint:fix`         | Lint and auto-fix what can be fixed                                                          |
+| `pnpm lint:probe`       | Check the ESLint config still enforces each rule                                             |
+| `pnpm lint:workflows`   | Lint GitHub Actions workflows with actionlint (+ shellcheck on `run:` steps)                 |
+| `pnpm lint:shell`       | Lint the pre-commit hook and `scripts/*.sh` with shellcheck                                  |
+| `pnpm format`           | Format all files with Prettier                                                               |
+| `pnpm format:check`     | Check formatting without writing changes                                                     |
+| `pnpm build`            | Bundle the CLI into `dist/index.mjs` with tsdown                                             |
+| `pnpm lint:package`     | Check the package is publishable (`bin`, `files`, ...) with publint                          |
+| `pnpm smoke`            | Build, pack, install the tarball into a temp project and run it                              |
 
 Check workflow YAML locally before pushing - catches typos, broken `${{ }}` expressions, bad `needs:` references and shell bugs in `run:` steps without waiting for a CI run:
 

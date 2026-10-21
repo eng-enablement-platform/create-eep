@@ -4,7 +4,8 @@ export default defineConfig({
   test: {
     // Tests live in a `__tests__/` folder next to the code they cover.
     include: ['**/__tests__/**/*.test.ts'],
-    exclude: ['node_modules/**', 'dist/**'],
+    // Integration tests run the built CLI - see vitest.integration.config.ts.
+    exclude: ['node_modules/**', 'dist/**', '**/*.integration.test.ts'],
     clearMocks: true,
     /*
      * Fails any test that writes to the console unexpectedly - console output

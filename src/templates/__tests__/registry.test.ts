@@ -1,20 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveTemplateSource, TEMPLATES, validateRef } from '../registry.ts';
+import {
+  findTemplate,
+  TEMPLATES,
+  templateSource,
+  validateRef,
+} from '../registry.ts';
 
-describe(resolveTemplateSource, () => {
-  it.each(TEMPLATES.map((template) => [template.name, template.source]))(
-    'resolves the built-in template "%s"',
-    (name, source) => {
-      expect(resolveTemplateSource(name)).toBe(source);
+describe(findTemplate, () => {
+  it.each(TEMPLATES.map((template) => [template.name, template.repository]))(
+    'finds the built-in template "%s"',
+    (name, repository) => {
+      expect(findTemplate(name)?.repository).toBe(repository);
     },
   );
-
-  it('pins a built-in template to a branch, tag or commit', () => {
-    expect(resolveTemplateSource('next-app', 'feat/my-change')).toBe(
-      'gh:eng-enablement-platform/eep-template-next-app#feat/my-change',
-    );
-  });
 
   it.each([
     'nope',
@@ -22,7 +21,19 @@ describe(resolveTemplateSource, () => {
     'gh:org/repo',
     'gh:eng-enablement-platform/eep-template-next-app',
   ])('rejects %s - only built-in template names are accepted', (input) => {
-    expect(resolveTemplateSource(input)).toBeUndefined();
+    expect(findTemplate(input)).toBeUndefined();
+  });
+});
+
+describe(templateSource, () => {
+  it('downloads the default branch without a ref', () => {
+    expect(templateSource('org/repo')).toBe('gh:org/repo');
+  });
+
+  it('pins a branch, tag or commit', () => {
+    expect(templateSource('org/repo', 'feat/my-change')).toBe(
+      'gh:org/repo#feat/my-change',
+    );
   });
 });
 

@@ -59,6 +59,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:integration": "tsdown --logLevel silent && vitest run --config vitest.integration.config.ts",
     "build": "tsdown",
     "lint:package": "publint",
     "smoke": "bash scripts/smoke-pack.sh",

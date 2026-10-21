@@ -2,8 +2,10 @@ import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
+import { templateSource } from '../templates/registry.ts';
 import type { DownloadTarget } from './download-errors.ts';
 import { describeDownloadError } from './download-errors.ts';
+import type { FindLatestRelease } from './latest-release.ts';
 
 /** Downloads a template into a directory - giget's `downloadTemplate` in production. */
 export type Downloader = (
@@ -43,25 +45,29 @@ type DownloadProjectOptions = DownloadTarget & {
   projectName: string;
   cwd: string;
   download: Downloader;
+  findLatestRelease: FindLatestRelease;
 };
 
 /**
- * Downloads a template into a new `<cwd>/<projectName>` directory. The
- * downloader is injected so tests can check the decisions without a network.
+ * Downloads a template into a new `<cwd>/<projectName>` directory - from
+ * `ref` when given, otherwise from the template's latest release, falling
+ * back to `main` when it has none. Dependencies are injected so tests can
+ * check the decisions without a network.
  *
- * @param options - Project name, template (name, giget source, ref), working directory and downloader.
- * @returns The absolute path of the downloaded project.
+ * @param options - Project name, template (name, repository, `--ref`), working directory, downloader and release lookup.
+ * @returns The absolute path of the downloaded project, and the ref used (`undefined` means `main`).
  * @example
  * ```ts
- * const dir = await downloadProject({ projectName: 'my-app', templateName: 'next-app', templateSource: 'gh:org/repo', cwd, download });
+ * const { dir, ref } = await downloadProject({ projectName: 'my-app', templateName: 'next-app', repository: 'org/repo', cwd, download, findLatestRelease });
  * ```
  */
 export async function downloadProject({
   projectName,
   cwd,
   download,
+  findLatestRelease,
   ...target
-}: DownloadProjectOptions): Promise<string> {
+}: DownloadProjectOptions): Promise<{ dir: string; ref: string | undefined }> {
   // Re-checked here so the guarantee holds even if a caller skipped it.
   const destinationProblem = checkDestination(cwd, projectName);
   if (destinationProblem !== undefined) {
@@ -69,10 +75,11 @@ export async function downloadProject({
   }
 
   try {
-    const { dir } = await download(target.templateSource, {
+    const ref = target.ref ?? (await findLatestRelease(target.repository));
+    const { dir } = await download(templateSource(target.repository, ref), {
       dir: path.resolve(cwd, projectName),
     });
-    return dir;
+    return { dir, ref };
   } catch (error) {
     throw new CreateProjectError(describeDownloadError(error, target));
   }
