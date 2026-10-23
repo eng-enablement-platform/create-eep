@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.5.0...v0.6.0) (2026-10-23)
+
+
+### Features
+
+* add integration tests and defualt to latest release ([cff521e](https://github.com/eng-enablement-platform/create-eep/commit/cff521ef507b69e2639e03b1b025797e759d327c))
+* add integration tests and defualt to latest release ([3411781](https://github.com/eng-enablement-platform/create-eep/commit/341178135b9699deccd2d3a2e57748faad8134ed))
+* add specific methods for download errors ([be3d949](https://github.com/eng-enablement-platform/create-eep/commit/be3d9495a147c074f76759735eea121cbaa0c90e))
+* add specific methods for download errors ([c07bcb5](https://github.com/eng-enablement-platform/create-eep/commit/c07bcb5effcec04a08ae944f927da5f3c086dfd3))
+* udpate smoke check ([1fc284e](https://github.com/eng-enablement-platform/create-eep/commit/1fc284eea18e4898dd676e64817b2a6c9be7127d))
+* udpate smoke check ([2e451a3](https://github.com/eng-enablement-platform/create-eep/commit/2e451a3468d7f1ac8589bfdcfdc229a6311e7617))
+
 ## [0.5.0](https://github.com/eng-enablement-platform/create-eep/compare/v0.4.0...v0.5.0) (2026-10-13)
 
 
