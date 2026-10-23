@@ -78,6 +78,14 @@ if [ ! -f "$WORK_DIR/smoke-app/index.html" ]; then
   ls -la "$WORK_DIR/smoke-app" || true
   exit 1
 fi
+# Proves the latest-release lookup still works against real GitHub - if
+# github.com changed its /releases/latest redirect, every user would silently
+# get main instead, and the fake-GitHub integration tests couldn't tell.
+if ! grep -q 'Downloaded the "web-dev-starter" template (v[0-9]' <<< "$OUTPUT"; then
+  echo "❌ Expected the template's latest release (vX.Y.Z), not main:"
+  echo "$OUTPUT"
+  exit 1
+fi
 # The template's .eep/ setup folder must never reach a generated project.
 if [ -e "$WORK_DIR/smoke-app/.eep" ]; then
   echo "❌ Scaffolded project still contains the template's .eep/ folder"
